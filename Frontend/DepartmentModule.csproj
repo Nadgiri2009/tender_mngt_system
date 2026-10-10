@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.props" Condition="Exists('$(MSBuildToolsPath)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{BC6B5A13-8BF8-47C3-9C16-084C6DA98920}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DepartmentModule</RootNamespace>
+    <AssemblyName>DepartmentModule</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>7.3</LangVersion>
+    <UseIISExpress>true</UseIISExpress>
+    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <WebProjectOutputDir>$(MSBuildProjectDirectory)\bin\</WebProjectOutputDir>
+    <OutputPath>bin\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Web" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Global.asax.cs"><DependentUpon>Global.asax</DependentUpon></Compile>
+    <Compile Include="Helpers\ModuleDb.cs" />
+    <Compile Include="Helpers\ModulePage.cs" />
+    <Compile Include="Helpers\WorkflowRules.cs" />
+    <Compile Include="Pages\Site.Master.cs"><DependentUpon>Site.Master</DependentUpon></Compile>
+    <Compile Include="Pages\Default.aspx.cs"><DependentUpon>Default.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\Tenders.aspx.cs"><DependentUpon>Tenders.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\TenderForm.aspx.cs"><DependentUpon>TenderForm.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\TenderDetails.aspx.cs"><DependentUpon>TenderDetails.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\Approvals.aspx.cs"><DependentUpon>Approvals.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\Bids.aspx.cs"><DependentUpon>Bids.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\WorkManagement.aspx.cs"><DependentUpon>WorkManagement.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\DocumentDownload.aspx.cs"><DependentUpon>DocumentDownload.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\Error.aspx.cs"><DependentUpon>Error.aspx</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Web.config" />
+    <Content Include="Global.asax" />
+    <Content Include="Pages\Site.Master" />
+    <Content Include="Pages\Default.aspx" />
+    <Content Include="Pages\Tenders.aspx" />
+    <Content Include="Pages\TenderForm.aspx" />
+    <Content Include="Pages\TenderDetails.aspx" />
+    <Content Include="Pages\Approvals.aspx" />
+    <Content Include="Pages\Bids.aspx" />
+    <Content Include="Pages\WorkManagement.aspx" />
+    <Content Include="Pages\DocumentDownload.aspx" />
+    <Content Include="Pages\Error.aspx" />
+    <Content Include="Content\Styles.css" />
+    <Content Include="..\Database\DepartmentModuleSchema.sql">
+      <Link>Database\DepartmentModuleSchema.sql</Link>
+    </Content>
+    <Content Include="README.md" />
+    <Content Include="INTEGRATION_GUIDE.md" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != '' And Exists('$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets')" />
+</Project>

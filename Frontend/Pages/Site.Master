@@ -1,0 +1,27 @@
+<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="Site.Master.cs" Inherits="DepartmentModule.Pages.SiteMaster" %>
+<!DOCTYPE html>
+<html lang="en">
+<head runat="server">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><asp:ContentPlaceHolder ID="TitleContent" runat="server">Department Tender Management</asp:ContentPlaceHolder></title>
+    <link href="<%= ResolveUrl("~/Content/Styles.css") %>" rel="stylesheet" />
+    <asp:ContentPlaceHolder ID="HeadContent" runat="server" />
+</head>
+<body>
+    <form id="ModuleForm" runat="server">
+        <header class="topbar">
+            <a class="brand" href="<%= ResolveUrl("~/Pages/Default.aspx") %>">Tender Management <span>Department Module</span></a>
+            <nav aria-label="Department navigation">
+                <a href="<%= ResolveUrl("~/Pages/Default.aspx") %>">Dashboard</a>
+                <a href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>">Tenders</a>
+                <a href="<%= ResolveUrl("~/Pages/Approvals.aspx") %>">Approvals</a>
+            </nav>
+        </header>
+        <main class="container">
+            <asp:ContentPlaceHolder ID="MainContent" runat="server" />
+        </main>
+        <footer class="footer">Department Tender Management Module</footer>
+    </form>
+</body>
+</html>
