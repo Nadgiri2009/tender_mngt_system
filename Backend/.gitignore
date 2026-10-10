@@ -1,0 +1,10 @@
+bin/
+obj/
+*.user
+.vs/
+appsettings.Production.json
+appsettings.json
+appsettings.Development.json
+!appsettings.Example.json
+wwwroot/uploads/*
+!wwwroot/uploads/.gitkeep
