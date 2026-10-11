@@ -48,6 +48,23 @@ a:hover { color: var(--purple-dark); text-decoration: underline; }
 nav { display: flex; gap: 1.2rem; flex-wrap: wrap; }
 nav a { color: #fff; font-weight: 600; }
 nav a:hover { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+.nav-user { color: #ffffffc9; font-size: .9rem; }
+
+.auth-layout { display: flex; min-height: 68vh; align-items: center; justify-content: center; padding: 2rem 1rem; }
+.auth-card { width: 100%; max-width: 480px; }
+.auth-mark { display: grid; width: 3rem; height: 3rem; margin: 0 auto .8rem; place-items: center; border-radius: 50%; background: #f4eaf5; color: var(--purple); font-size: .85rem; font-weight: 800; }
+.auth-card h1, .auth-card > .muted, .auth-note { text-align: center; }
+.auth-submit { width: 100%; }
+.auth-note { margin: 1rem 0 0; color: var(--muted); font-size: .9rem; }
+.hero { display: flex; min-height: 250px; align-items: center; padding: clamp(1.5rem, 4vw, 3.5rem); background: var(--gradient); color: #fff; }
+.hero h1 { color: #fff; font-size: clamp(2rem, 5vw, 3rem); }
+.hero .eyebrow { margin: 0 0 .5rem; color: #ffffffc9; font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.hero-copy { max-width: 650px; margin: .7rem 0 1.3rem; color: #ffffffdf; font-size: 1.05rem; }
+.hero .button.secondary { margin-left: .5rem; border-color: #ffffffa8; background: #ffffff16; color: #fff; }
+.admin-links, .admin-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
+.admin-links h2 { width: 100%; }
+details { padding: .75rem 0; border-top: 1px solid var(--border); }
+summary { cursor: pointer; color: var(--purple-dark); font-weight: 600; }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem 2.5rem; }
 .footer { padding: 1rem; color: var(--muted); font-size: .8rem; text-align: center; }
@@ -178,6 +195,8 @@ tr:hover td { background: #fdfafd; }
     nav { gap: .8rem 1rem; }
     .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .page-heading { align-items: flex-start; flex-direction: column; }
+    .topbar { align-items: flex-start; flex-direction: column; }
+    .hero .button.secondary { margin: .6rem 0 0; }
     .container { padding: 1rem .7rem 2rem; }
     .card { padding: 1rem; }
 }

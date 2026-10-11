@@ -13,10 +13,12 @@ namespace DepartmentModule.Pages
         protected Literal TenderNumber, TenderTitle, Message;
         protected HyperLink BackLink;
         protected GridView TechnicalGrid, FinancialGrid;
-        protected Panel EvaluatePanel, SelectPanel;
-        protected DropDownList TechnicalBidSelect, TechnicalStatus, FinancialBidSelect;
-        protected TextBox TechnicalRemarks, SelectionRemarks;
-        protected Button EvaluateButton, SelectContractorButton;
+        protected Panel EvaluatePanel, SelectPanel, TechnicalSubmissionPanel, FinancialSubmissionPanel;
+        protected DropDownList TechnicalBidSelect, TechnicalStatus, FinancialBidSelect, TechnicalContractorSelect, FinancialContractorSelect;
+        protected TextBox TechnicalRemarks, SelectionRemarks, TechnicalDocumentPathText, FinancialBidAmountText;
+        protected Button EvaluateButton, SelectContractorButton, SubmitTechnicalButton, SubmitFinancialButton;
+        protected Literal ContractorProfileMessage;
+        protected System.Web.UI.HtmlControls.HtmlGenericControl TechnicalContractorField, FinancialContractorField;
         private int TenderId { get { return QueryId("tenderId"); } }
 
         protected void Page_Load(object sender, EventArgs e)
@@ -53,6 +55,7 @@ namespace DepartmentModule.Pages
                     BindFinancial(connection);
                     EvaluatePanel.Visible = HasAnyRole("TenderSection", "Admin");
                     SelectPanel.Visible = HasAnyRole("TenderCommittee", "Admin");
+                    ConfigureSubmissionPanels(connection);
                 }
             }
             catch (SqlException ex)
@@ -111,6 +114,231 @@ namespace DepartmentModule.Pages
                         Convert.ToDecimal(row["BidAmount"]).ToString("C", CultureInfo.CurrentCulture),
                         Convert.ToString(row["ContractorId"], CultureInfo.InvariantCulture)));
                 }
+            }
+        }
+
+        private void ConfigureSubmissionPanels(SqlConnection connection)
+        {
+            FinancialBidAmountText.Attributes["step"] = "0.01";
+            FinancialBidAmountText.Attributes["min"] = "0.01";
+            bool isContractor = HasAnyRole("Contractor");
+            bool isAdmin = HasAnyRole("Admin");
+            TechnicalSubmissionPanel.Visible = isContractor || isAdmin;
+            FinancialSubmissionPanel.Visible = isContractor || isAdmin;
+            TechnicalContractorField.Visible = isAdmin;
+            FinancialContractorField.Visible = isAdmin;
+
+            if (isAdmin)
+            {
+                BindContractors(connection, TechnicalContractorSelect);
+                BindContractors(connection, FinancialContractorSelect);
+                return;
+            }
+
+            if (!isContractor)
+            {
+                return;
+            }
+
+            int? contractorId = GetCurrentContractorId(connection);
+            if (!contractorId.HasValue)
+            {
+                ContractorProfileMessage.Text = "<div class=\"message\">No active contractor profile is linked to this account. Contact an administrator to link your contractor record.</div>";
+                SubmitTechnicalButton.Enabled = false;
+                SubmitFinancialButton.Enabled = false;
+                return;
+            }
+
+            string technicalStatus;
+            using (SqlCommand command = new SqlCommand(
+                "SELECT Status FROM dbo.TechnicalBid WHERE TenderId=@TenderId AND ContractorId=@ContractorId;", connection))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId.Value);
+                technicalStatus = Convert.ToString(command.ExecuteScalar());
+            }
+
+            if (!String.IsNullOrEmpty(technicalStatus))
+            {
+                SubmitTechnicalButton.Enabled = false;
+                ContractorProfileMessage.Text = "<div class=\"message\">Your technical bid status is " + HttpUtility.HtmlEncode(technicalStatus) + ".</div>";
+            }
+
+            if (!String.Equals(technicalStatus, "Qualified", StringComparison.OrdinalIgnoreCase))
+            {
+                FinancialSubmissionPanel.Visible = false;
+                return;
+            }
+
+            using (SqlCommand command = new SqlCommand(
+                "SELECT COUNT(1) FROM dbo.FinancialBid WHERE TenderId=@TenderId AND ContractorId=@ContractorId;", connection))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId.Value);
+                if (Convert.ToInt32(command.ExecuteScalar()) > 0)
+                {
+                    SubmitFinancialButton.Enabled = false;
+                    ContractorProfileMessage.Text = "<div class=\"message\">Your financial bid has already been submitted.</div>";
+                }
+            }
+        }
+
+        private static void BindContractors(SqlConnection connection, DropDownList list)
+        {
+            list.Items.Clear();
+            list.Items.Add(new ListItem("Select contractor", ""));
+            using (SqlCommand command = new SqlCommand(
+                "SELECT ContractorId,Name FROM dbo.Contractors WHERE IsActive=1 ORDER BY Name;", connection))
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    list.Items.Add(new ListItem(
+                        Convert.ToString(reader["Name"]),
+                        Convert.ToString(reader["ContractorId"], CultureInfo.InvariantCulture)));
+                }
+            }
+        }
+
+        private int? GetCurrentContractorId(SqlConnection connection)
+        {
+            using (SqlCommand command = new SqlCommand(
+                "SELECT ContractorId FROM dbo.Contractors WHERE UserId=@UserId AND IsActive=1;", connection))
+            {
+                ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                object value = command.ExecuteScalar();
+                return value == null || value == DBNull.Value ? (int?)null : Convert.ToInt32(value);
+            }
+        }
+
+        private int? ResolveSubmissionContractorId(SqlConnection connection, DropDownList contractorList)
+        {
+            if (HasAnyRole("Contractor"))
+            {
+                return GetCurrentContractorId(connection);
+            }
+
+            int contractorId;
+            if (!HasAnyRole("Admin") || !Int32.TryParse(contractorList.SelectedValue, out contractorId) || contractorId <= 0)
+            {
+                return null;
+            }
+
+            using (SqlCommand command = new SqlCommand(
+                "SELECT COUNT(1) FROM dbo.Contractors WHERE ContractorId=@ContractorId AND IsActive=1;", connection))
+            {
+                ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId);
+                return Convert.ToInt32(command.ExecuteScalar()) == 1 ? (int?)contractorId : null;
+            }
+        }
+
+        protected void SubmitTechnicalButton_Click(object sender, EventArgs e)
+        {
+            if (!HasAnyRole("Contractor", "Admin") || TechnicalDocumentPathText.Text.Trim().Length > 400)
+            {
+                ShowError("A contractor or administrator must submit the bid, and the document path cannot exceed 400 characters.");
+                return;
+            }
+
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                {
+                    int? contractorId = ResolveSubmissionContractorId(connection, TechnicalContractorSelect);
+                    if (!contractorId.HasValue)
+                    {
+                        ShowError("An active contractor profile is required to submit a technical bid.");
+                        return;
+                    }
+
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        using (SqlCommand command = new SqlCommand(
+                            @"INSERT INTO dbo.TechnicalBid (TenderId,ContractorId,DocumentPath,Status,SubmittedDate)
+                              VALUES (@TenderId,@ContractorId,@DocumentPath,N'Submitted',SYSUTCDATETIME());", connection, transaction))
+                        {
+                            ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                            ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId.Value);
+                            AddText(command, "@DocumentPath", SqlDbType.NVarChar, TechnicalDocumentPathText.Text, 400);
+                            command.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                }
+
+                Message.Text = "<div class=\"message success\">Technical bid submitted.</div>";
+                LoadPage();
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Technical bid submission failed.", ex);
+                ShowError(ex.Number == 2601 || ex.Number == 2627
+                    ? "A technical bid has already been submitted for this contractor and tender."
+                    : "The technical bid could not be submitted.");
+            }
+        }
+
+        protected void SubmitFinancialButton_Click(object sender, EventArgs e)
+        {
+            decimal bidAmount;
+            if (!HasAnyRole("Contractor", "Admin") ||
+                !Decimal.TryParse(FinancialBidAmountText.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out bidAmount) ||
+                bidAmount < 0.01m || bidAmount > 9999999999999999.99m || Decimal.Round(bidAmount, 2) != bidAmount)
+            {
+                ShowError("Enter a valid bid amount greater than zero with no more than two decimal places.");
+                return;
+            }
+
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                {
+                    int? contractorId = ResolveSubmissionContractorId(connection, FinancialContractorSelect);
+                    if (!contractorId.HasValue)
+                    {
+                        ShowError("An active contractor profile is required to submit a financial bid.");
+                        return;
+                    }
+
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        using (SqlCommand qualifiedCommand = new SqlCommand(
+                            "SELECT COUNT(1) FROM dbo.TechnicalBid WHERE TenderId=@TenderId AND ContractorId=@ContractorId AND Status=N'Qualified';",
+                            connection, transaction))
+                        {
+                            ModuleDb.AddParameter(qualifiedCommand, "@TenderId", SqlDbType.Int, TenderId);
+                            ModuleDb.AddParameter(qualifiedCommand, "@ContractorId", SqlDbType.Int, contractorId.Value);
+                            if (Convert.ToInt32(qualifiedCommand.ExecuteScalar()) != 1)
+                            {
+                                ShowError("Only contractors with a Qualified technical bid may submit a financial bid.");
+                                return;
+                            }
+                        }
+
+                        using (SqlCommand command = new SqlCommand(
+                            @"INSERT INTO dbo.FinancialBid (TenderId,ContractorId,BidAmount,Status,SubmittedDate)
+                              VALUES (@TenderId,@ContractorId,@BidAmount,N'Submitted',SYSUTCDATETIME());", connection, transaction))
+                        {
+                            ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                            ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId.Value);
+                            ModuleDb.AddParameter(command, "@BidAmount", SqlDbType.Decimal, bidAmount);
+                            command.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                }
+
+                Message.Text = "<div class=\"message success\">Financial bid submitted.</div>";
+                LoadPage();
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Financial bid submission failed.", ex);
+                ShowError(ex.Number == 2601 || ex.Number == 2627
+                    ? "A financial bid has already been submitted for this contractor and tender."
+                    : "The financial bid could not be submitted.");
             }
         }
 

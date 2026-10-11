@@ -18,7 +18,8 @@ namespace DepartmentModule.Pages
         protected TextBox ItemName, ItemDescription, Quantity, Unit, Rate, Remarks;
         protected FileUpload DocumentFile;
         protected Button AddBoqButton, UploadButton, SubmitWorkflowButton, ApproveButton, RejectButton;
-        protected HyperLink BidsLink, WorkLink;
+        protected Button DeleteTenderButton;
+        protected HyperLink BidsLink, WorkLink, EditTenderLink;
         private int TenderId { get { return QueryId("id"); } }
         private string TenderStatus { get; set; }
         private bool IsDraft { get; set; }
@@ -72,6 +73,9 @@ namespace DepartmentModule.Pages
                     BindChildTables(connection);
                 }
                 IsDraft = String.Equals(TenderStatus, "Draft", StringComparison.OrdinalIgnoreCase);
+                EditTenderLink.Visible = IsDraft && HasAnyRole("Admin");
+                EditTenderLink.NavigateUrl = "~/Pages/TenderForm.aspx?id=" + TenderId.ToString(CultureInfo.InvariantCulture);
+                DeleteTenderButton.Visible = IsDraft && HasAnyRole("Admin");
                 AddBoqPanel.Visible = IsDraft && HasAnyRole("DepartmentOfficer", "Admin");
                 UploadPanel.Visible = HasAnyRole("DepartmentOfficer", "Admin");
                 BoqGrid.Columns[6].Visible = AddBoqPanel.Visible;
@@ -250,6 +254,49 @@ namespace DepartmentModule.Pages
         protected void SubmitWorkflowButton_Click(object sender, EventArgs e) { SaveTransition("Submitted"); }
         protected void ApproveButton_Click(object sender, EventArgs e) { SaveTransition("Approved"); }
         protected void RejectButton_Click(object sender, EventArgs e) { SaveTransition("Rejected"); }
+
+        protected void DeleteTenderButton_Click(object sender, EventArgs e)
+        {
+            if (!HasAnyRole("Admin") || !String.Equals(TenderStatus, "Draft", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowError("Only an administrator can delete a draft tender.");
+                return;
+            }
+
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                using (SqlTransaction transaction = connection.BeginTransaction())
+                {
+                    using (SqlCommand command = new SqlCommand(
+                        @"UPDATE dbo.Tender
+                          SET IsDeleted=1,ModifiedBy=@ModifiedBy,ModifiedDate=SYSUTCDATETIME()
+                          WHERE TenderId=@TenderId AND CurrentStatus=N'Draft' AND IsDeleted=0;", connection, transaction))
+                    {
+                        ModuleDb.AddParameter(command, "@ModifiedBy", SqlDbType.Int, CurrentUserId);
+                        ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                        if (command.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException("Only an existing draft tender can be deleted.");
+                    }
+
+                    ModuleDb.AddAudit(connection, transaction, CurrentUserId, "Delete", "Tender",
+                        TenderId, "Soft deleted draft tender", Request.UserHostAddress);
+                    transaction.Commit();
+                }
+
+                Response.Redirect("~/Pages/Tenders.aspx", false);
+                Context.ApplicationInstance.CompleteRequest();
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Tender deletion failed.", ex);
+                ShowError("The tender could not be deleted. Please retry or contact support.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowError(ex.Message);
+            }
+        }
 
         private void SaveTransition(string action)
         {

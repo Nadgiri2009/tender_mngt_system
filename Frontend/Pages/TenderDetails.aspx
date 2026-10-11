@@ -4,7 +4,12 @@
     <div class="page-heading">
         <div><h1><asp:Literal ID="TenderTitle" runat="server" /></h1>
             <div class="muted"><asp:Literal ID="TenderNumber" runat="server" /> · <asp:Literal ID="DepartmentName" runat="server" /></div></div>
-        <a href="Tenders.aspx" class="button secondary">Back to tenders</a>
+        <div class="row">
+            <asp:HyperLink ID="EditTenderLink" runat="server" CssClass="button secondary" Visible="false">Edit draft</asp:HyperLink>
+            <asp:Button ID="DeleteTenderButton" runat="server" Text="Delete draft" CssClass="button danger" Visible="false"
+                OnClick="DeleteTenderButton_Click" OnClientClick="return confirm('Delete this draft tender? This action cannot be undone.');" />
+            <a href="Tenders.aspx" class="button secondary">Back to tenders</a>
+        </div>
     </div>
     <asp:Literal ID="Message" runat="server" />
     <section class="card">
