@@ -11,17 +11,24 @@
 <body>
     <form id="ModuleForm" runat="server">
         <header class="topbar">
-            <a class="brand" href="<%= ResolveUrl("~/Pages/Default.aspx") %>">Tender Management <span>Department Module</span></a>
-            <nav aria-label="Department navigation">
-                <a href="<%= ResolveUrl("~/Pages/Default.aspx") %>">Dashboard</a>
+            <a class="brand" href="<%= ResolveUrl("~/Pages/Home.aspx") %>">Solapur Municipal Corporation <span>Tender Management System</span></a>
+            <nav aria-label="Primary navigation">
+                <a href="<%= ResolveUrl("~/Pages/Home.aspx") %>">Home</a>
                 <a href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>">Tenders</a>
-                <a href="<%= ResolveUrl("~/Pages/Approvals.aspx") %>">Approvals</a>
+                <a href="<%= ResolveUrl("~/Pages/Home.aspx#announcements") %>">Notices</a>
+                <asp:HyperLink ID="DashboardLink" runat="server" NavigateUrl="~/Pages/Default.aspx" Visible="false">Dashboard</asp:HyperLink>
+                <asp:HyperLink ID="ApprovalsLink" runat="server" NavigateUrl="~/Pages/Approvals.aspx" Visible="false">Approvals</asp:HyperLink>
+                <asp:HyperLink ID="AdminLink" runat="server" NavigateUrl="~/Pages/Admin.aspx" Visible="false">Administration</asp:HyperLink>
+                <asp:HyperLink ID="LoginLink" runat="server" NavigateUrl="~/Pages/Login.aspx">Login</asp:HyperLink>
+                <asp:HyperLink ID="RegisterLink" runat="server" NavigateUrl="~/Pages/Register.aspx">Register</asp:HyperLink>
+                <asp:Literal ID="CurrentUser" runat="server" />
+                <asp:LinkButton ID="SignOutLink" runat="server" OnClick="SignOutLink_Click" Visible="false">Sign out</asp:LinkButton>
             </nav>
         </header>
         <main class="container">
             <asp:ContentPlaceHolder ID="MainContent" runat="server" />
         </main>
-        <footer class="footer">Department Tender Management Module</footer>
+        <footer class="footer">Solapur Municipal Corporation · Official e-Tender Portal</footer>
     </form>
 </body>
 </html>

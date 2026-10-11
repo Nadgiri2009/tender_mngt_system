@@ -5,6 +5,19 @@
     <asp:Literal ID="Message" runat="server" />
     <section class="card">
         <h2>Technical bids</h2>
+        <asp:Panel ID="TechnicalSubmissionPanel" runat="server" CssClass="card">
+            <h3>Submit technical bid</h3>
+            <asp:Literal ID="ContractorProfileMessage" runat="server" />
+            <div class="field" id="TechnicalContractorField" runat="server">
+                <label for="TechnicalContractorSelect">Contractor</label>
+                <asp:DropDownList ID="TechnicalContractorSelect" runat="server" />
+            </div>
+            <div class="field">
+                <label for="TechnicalDocumentPathText">Document Path (optional)</label>
+                <asp:TextBox ID="TechnicalDocumentPathText" runat="server" MaxLength="400" />
+            </div>
+            <asp:Button ID="SubmitTechnicalButton" runat="server" Text="Submit technical bid" OnClick="SubmitTechnicalButton_Click" />
+        </asp:Panel>
         <div class="table-wrap"><asp:GridView ID="TechnicalGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No technical bids submitted yet.">
             <Columns>
                 <asp:BoundField DataField="ContractorName" HeaderText="Contractor" />
@@ -25,6 +38,18 @@
     </section>
     <section class="card">
         <h2>Financial bids (lowest bid ranks first)</h2>
+        <asp:Panel ID="FinancialSubmissionPanel" runat="server" CssClass="card">
+            <h3>Submit financial bid</h3>
+            <div class="field" id="FinancialContractorField" runat="server">
+                <label for="FinancialContractorSelect">Contractor</label>
+                <asp:DropDownList ID="FinancialContractorSelect" runat="server" />
+            </div>
+            <div class="field">
+                <label for="FinancialBidAmountText">Bid Amount (₹)</label>
+                <asp:TextBox ID="FinancialBidAmountText" runat="server" TextMode="Number" />
+            </div>
+            <asp:Button ID="SubmitFinancialButton" runat="server" Text="Submit financial bid" OnClick="SubmitFinancialButton_Click" />
+        </asp:Panel>
         <div class="table-wrap"><asp:GridView ID="FinancialGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No financial bids submitted yet.">
             <Columns>
                 <asp:BoundField DataField="Rank" HeaderText="Rank" DataFormatString="L{0}" />

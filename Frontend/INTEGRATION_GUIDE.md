@@ -1,6 +1,8 @@
 # Department Panel integration guide
 
-The original portal and API source have been restored in their original `Frontend/src` and `Backend/src` locations. The Web Forms department module remains at the `Frontend` root. Keep these entry points and their configurations distinct; do not replace or overwrite the main Department Panel's project, authentication pages, shared configuration, or navigation files.
+The Web Forms implementation is in the existing `Frontend` directory as a .NET Framework application. React/Next.js source, its Node package manifests/dependencies, and generated Next.js output have been removed. Keep the main Department Panel's authentication and authorization as the source of truth for staff access. The Web Forms project also contains public portal login and contractor-registration pages, but those do not replace the main panel's staff authentication.
+
+The separate `Backend` directory still contains an ASP.NET Core 8 / Entity Framework API. It is not referenced or deployed by this Web Forms project and has not been migrated or removed. The Web Forms pages use direct ADO.NET SQL Server access.
 
 ## 1. Files and layout
 
@@ -8,10 +10,6 @@ The Web Forms project is rooted in the existing `Frontend` directory:
 
 ```text
 Frontend/
-  package.json                  # restored original Next.js portal
-  src/
-    app/(public)/login/page.tsx # original login route, restored unchanged
-    app/(public)/register/page.tsx
   DepartmentModule.csproj
   Web.config
   Global.asax
@@ -21,6 +19,13 @@ Frontend/
     WorkflowRules.cs
   Pages/
     Site.Master
+    Home.aspx(.cs)
+    Login.aspx(.cs)
+    Register.aspx(.cs)
+    Admin.aspx(.cs)
+    AdminUsers.aspx(.cs)
+    AdminDepartments.aspx(.cs)
+    AdminAnnouncements.aspx(.cs)
     Default.aspx(.cs)
     Tenders.aspx(.cs)
     TenderForm.aspx(.cs)
@@ -37,9 +42,9 @@ Database/
   DepartmentModuleSchema.sql
 ```
 
-`Frontend/src` and `Backend/src` were restored byte-for-byte from the intact project snapshot; generated dependency and build folders were not copied. `Backend/TenderManagement.sln` is the original .NET 8 API solution. The Web Forms project is a separate classic ASP.NET Web Application targeting **.NET Framework 4.8** and is opened directly through `Frontend/DepartmentModule.csproj`.
+The existing Web Forms project targets **.NET Framework 4.8** and is built from `Frontend/DepartmentModule.csproj`. Its root default document is configured as `Pages/Home.aspx`. It does not require Node.js, the ASP.NET Core API, or Entity Framework.
 
-To run the restored portal, run `npm ci` and `npm run dev` from `Frontend`; its login and registration routes are `/login` and `/register`. To build the original API, use `dotnet build Backend/TenderManagement.sln`. The Web Forms module runs through IIS Express/IIS at `Pages/Default.aspx`.
+Migration coverage is not yet complete or end-to-end verified. Contractor-side technical and qualified financial bid submission are implemented on the Web Forms bid page. A newly registered contractor must first be linked to a `dbo.Contractors` record by an administrator in Manage Users. Do not retire the legacy API or treat the migration as feature-complete until remaining behavior has been ported and tested.
 
 ## 2. IIS and framework prerequisites
 
@@ -55,11 +60,11 @@ Run `Database/DepartmentModuleSchema.sql` against `TenderManagementDB`. It check
 
 ## 5. Entry page and navigation
 
-The module entry is `Pages/Default.aspx`. Publish the module under a protected virtual application/path such as `/DepartmentTender`, then add a link in the main Department Panel to `/DepartmentTender/Pages/Default.aspx`. Keep the module project and static files under their own IIS application boundary if sharing one server; do not overwrite the panel's `Web.config`, `Global.asax`, master page, CSS, or route files.
+The configured root entry is `Pages/Home.aspx`; the staff dashboard is `Pages/Default.aspx`. Add the appropriate link in the existing Department Panel to the staff dashboard (or its application-relative URL). Keep the current `Pages/` path and merge the Web Forms pages into the existing application without replacing the panel's project, `Web.config`, `Global.asax`, master page, CSS, or route files. If the host requires an IIS child application, use a trusted authentication handoff as described below.
 
 ## 6. Authentication, session, and authorization handoff
 
-The restored portal retains its original login and registration pages under `Frontend/src`, along with the API authentication endpoints under `Backend/src`; these source files were restored unchanged. They are not automatically an authentication bridge for the separate Web Forms application. Before allowing Web Forms module entry, the host panel must authenticate the staff member and authorize access to the department module. The Web Forms module reads these session values:
+The host Department Panel must authenticate the staff member and authorize access before opening the module. The Web Forms module reads these session values:
 
 | Purpose | Default key | Required value |
 |---|---|---|
@@ -67,41 +72,42 @@ The restored portal retains its original login and registration pages under `Fro
 | Role | `RoleName` | Existing role name such as `DepartmentOfficer`, `CAFOOfficer`, `TenderSection`, or `TenderCommittee` |
 | Department identity | `DepartmentId` | Optional positive `dbo.Departments.DepartmentId` |
 
-If the host uses other key names, update `SessionUserIdKey`, `SessionRoleKey`, and `SessionDepartmentIdKey` in `Web.config`. The user ID must refer to the same `dbo.Users` row used by existing foreign keys, and the role value must be assigned by the trusted server-side authentication process (never from a request parameter or browser form). If the module is a separate IIS application, implement a secure host-to-module session/SSO bridge; do not assume ASP.NET session state is shared across applications. `ModulePage` rejects unauthenticated requests and every write handler repeats role and business-rule checks server-side.
+Set `DepartmentPanelLoginUrl` in `Web.config` to the main panel's actual sign-in URL before integration. The Web Forms project includes public portal login/registration pages, but protected staff pages must continue to use the main panel's authenticated identity. If the host uses other session key names, update `SessionUserIdKey`, `SessionRoleKey`, and `SessionDepartmentIdKey`. The user ID must refer to the same `dbo.Users` row used by existing foreign keys, and the role value must be assigned by the trusted server-side authentication process (never from a request parameter or browser form). `ModulePage` rejects unauthenticated requests and every write handler repeats role and business-rule checks server-side. Draft edits and soft deletion are restricted to `Admin`; only draft tenders can be edited or deleted.
 
-The host must continue enforcing its own page authorization for the navigation link, deny untrusted users, and protect session cookies with HTTPS. Do not replace or alter the restored portal login flow. If the portal and Web Forms module need to share authentication, implement a secure trusted session/SSO handoff; do not assume their sessions or tokens are interchangeable.
+The host must enforce its own page authorization for the navigation link, deny untrusted users, and protect session cookies with HTTPS. If the module is hosted as a separate IIS application, implement a secure trusted session/SSO handoff; do not assume ASP.NET session state is shared across applications.
 
 ## 7. Naming and configuration conflict prevention
 
-- Keep the module assembly name `DepartmentModule`; change it consistently if the host already uses that name.
+- Keep the existing assembly name `DepartmentModule`; change it consistently if the host already uses that name.
 - Retain the existing `dbo` object names and database. The module creates no tables, indexes, roles, seed data, or procedures.
 - Keep its connection string name `TenderManagement`; if merged into a host config, ensure the name is unique and point it to the established DB.
 - Do not overwrite the host's `Web.config`, `Global.asax`, `Site.Master`, `Styles.css`, or application session/authentication settings. Merge only the module's connection-string/appSettings and IIS handlers as needed.
 - Keep upload storage isolated under the configured `UploadRoot` (default `~/Uploads`) and grant write permission only to the IIS app identity. Files are downloaded through the authenticated module handler.
-- If the host already owns `Default.aspx` or similar names, retain the module's `Pages/` path rather than copying module pages over host pages.
+- If the host already owns a default page or similar names, retain the existing `Pages/` path rather than overwriting the host page.
 
 ## 8. Protect the main panel
 
-Keep the main panel files and authentication as the source of truth. Add only a navigation link and the explicit trusted session handoff described above. Review the IIS virtual-directory application boundary, session cookie path/domain/SameSite settings, access permissions to uploads, and role mapping before deploying. Do not copy the module's `Web.config` over the main panel's config.
+Keep the main panel files and authentication as the source of truth. Add the module pages/project into the existing source tree and a navigation link, then implement the trusted session handoff described above. Review the IIS application boundary, session cookie path/domain/SameSite settings, access permissions to uploads, and role mapping before deploying. Do not copy this module's `Web.config` over the main panel's config.
 
 ## 9. Integration tests
 
 Use non-production test accounts and a restored/test database:
 
-1. Verify unauthenticated access is redirected to the main panel's login and an authenticated role cannot reach actions outside its grants.
+1. After setting `DepartmentPanelLoginUrl`, verify unauthenticated access is redirected to the main panel's login and an authenticated role cannot reach actions outside its grants.
 2. Create a tender with each supported tender type; test required title, title length, department, amount, optional deadline, and allowed/blocked upload extensions and sizes.
 3. Confirm department dropdown options come from active SQL Server department rows; check tender number uniqueness under concurrent test submissions.
-4. Add/remove BOQ items in Draft only and verify computed line amounts and all SQL values persist.
-5. Exercise each submit/approve/reject stage with the correct and incorrect role. Verify invalid transitions do not update `Tender` or `ApprovalHistory`, and valid moves write both atomically.
-6. Confirm pending approvals are role-specific, status/history are accurate, and pagination/filter/search/sorting return expected results.
-7. Evaluate technical bids, verify only `Qualified`/`Disqualified` is accepted, and recommend a financial bidder as Tender Committee. Confirm ranked bids are ordered lowest-first.
-8. Record agreements, work orders, progress (including boundary values 0 and 100), measurements, bill approval, and payment. Verify only an approved bill can be paid and duplicate transaction numbers are rejected.
-9. Upload, download through the authenticated handler, and verify invalid IDs/path traversal cannot read files outside the upload root.
-10. Confirm SQL Server logs/audit records, database reads and writes, session expiry, IIS error logs, and responsive rendering at desktop and mobile widths.
+4. Edit and soft-delete draft tenders as Admin; verify non-admin users are denied and non-draft tenders cannot be edited or deleted.
+5. Add/remove BOQ items in Draft only and verify computed line amounts and all SQL values persist.
+6. Exercise each submit/approve/reject stage with the correct and incorrect role. Verify invalid transitions do not update `Tender` or `ApprovalHistory`, and valid moves write both atomically.
+7. Confirm pending approvals are role-specific, status/history are accurate, and pagination/filter/search/sorting return expected results.
+8. Evaluate technical bids, verify only `Qualified`/`Disqualified` is accepted, and recommend a financial bidder as Tender Committee. Confirm ranked bids are ordered lowest-first.
+9. Record agreements, work orders, progress (including boundary values 0 and 100), measurements, bill approval, and payment. Verify only an approved bill can be paid and duplicate transaction numbers are rejected.
+10. Upload, download through the authenticated handler, and verify invalid IDs/path traversal cannot read files outside the upload root.
+11. Confirm SQL Server logs/audit records, database reads and writes, session expiry, IIS error logs, and responsive rendering at desktop and mobile widths.
 
 ## 10. Deploy and troubleshoot
 
-Build the classic project in Visual Studio/Build Tools with the .NET Framework 4.8 Web Application targets. Publish to the dedicated IIS application, set the production connection string and HTTPS, grant least-privilege database and upload-folder permissions, and verify the panel session integration. Do not use `dotnet publish` for ASP.NET Core.
+Build the classic project in Visual Studio/Build Tools with the .NET Framework 4.8 Web Application targets. Publish the Web Forms application to IIS, set the production connection string and HTTPS, grant least-privilege database and upload-folder permissions, and verify the panel session integration. Do not use `dotnet publish` for ASP.NET Core.
 
 - **Parser/build errors:** verify the .NET Framework 4.8 targeting pack and Web Build Tools are installed and that the Web Application project is opened/built in Visual Studio/MSBuild.
 - **Login redirect loop:** confirm the host and module share the intended session or the secure SSO bridge, and that the configured session keys are populated before navigating.
@@ -114,4 +120,4 @@ Build the classic project in Visual Studio/Build Tools with the .NET Framework 4
 
 ## Scope preserved
 
-Department-side tender intake, dropdown lookup, draft BOQ and supporting documents, tender search/filter/sort/pagination, full defined status sequence, stage-level role gates, approval/rejection history, technical bid evaluation, financial bid ranking/recommendation, work execution, measurement books, bill approvals, and payment release are represented in the module. The public/contractor/admin screens remain outside this Department Panel module; contractor bid submission and admin account/configuration tasks stay with their existing host areas.
+Department-side tender intake, administrator draft editing/deletion, dropdown lookup, draft BOQ and supporting documents, tender search/filter/sort/pagination, defined status sequence, stage-level role gates, approval/rejection history, contractor technical/financial bid submissions, technical bid evaluation, financial bid ranking/recommendation, work execution, measurement books, bill approvals, and payment release are represented in the module. The module also includes public home/login/registration pages and admin user, contractor-profile, department, and announcement management. Verify parity against the retained API before removing it.
