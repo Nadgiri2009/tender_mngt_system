@@ -6,8 +6,8 @@ namespace TenderManagement.Application.Interfaces
 {
     public interface ITenderService
     {
-        Task<PagedResult<TenderListItemDto>> GetTendersAsync(PaginationQuery query);
-        Task<TenderDetailDto> GetTenderByIdAsync(int id);
+        Task<PagedResult<TenderListItemDto>> GetTendersAsync(PaginationQuery query, int? createdByUserId = null);
+        Task<TenderDetailDto> GetTenderByIdAsync(int id, int? createdByUserId = null, bool allowPublishedForOtherOwners = false);
         Task<TenderDetailDto> CreateTenderAsync(CreateTenderDto dto, int currentUserId);
         Task<TenderDetailDto> UpdateTenderAsync(int id, UpdateTenderDto dto, int currentUserId);
         Task DeleteTenderAsync(int id, int currentUserId);

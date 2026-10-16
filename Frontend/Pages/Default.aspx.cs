@@ -8,20 +8,19 @@ namespace DepartmentModule.Pages
 {
     public partial class DepartmentDashboard : ModulePage
     {
-        protected Literal Message;
-        protected Literal TotalTenders;
-        protected Literal PublishedTenders;
-        protected Literal PendingCount;
-        protected Literal CompletedTenders;
+        protected Literal Message, TotalTenders, ApprovedTenders, PendingCount, RejectedTenders, UnderReviewTenders, RecentHeading;
         protected HyperLink NewTenderLink;
-        protected GridView PendingGrid;
-        protected GridView RecentGrid;
+        protected Panel PendingApprovalsPanel;
+        protected GridView PendingGrid, RecentGrid, CategoryStatsGrid, UpcomingGrid;
 
         protected void Page_Load(object sender, EventArgs e)
         {
             if (!IsPostBack)
             {
+                bool isRespOfficer = HasAnyRole("DepartmentOfficer");
                 NewTenderLink.Visible = HasAnyRole("DepartmentOfficer", "Admin");
+                PendingApprovalsPanel.Visible = !isRespOfficer;
+                RecentHeading.Text = isRespOfficer ? "My recent tenders" : "Recently updated tenders";
                 LoadDashboard();
             }
         }
@@ -32,48 +31,98 @@ namespace DepartmentModule.Pages
             {
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 {
+                    bool isRespOfficer = HasAnyRole("DepartmentOfficer");
+                    string ownerFilter = isRespOfficer ? " AND t.CreatedBy=@CurrentUserId" : String.Empty;
                     using (SqlCommand command = new SqlCommand(
                         @"SELECT COUNT(*) AS TotalTenders,
-                                 SUM(CASE WHEN CurrentStatus = N'Tender Published' THEN 1 ELSE 0 END) AS PublishedTenders,
-                                 SUM(CASE WHEN CurrentStatus LIKE N'%Pending%' OR CurrentStatus LIKE N'%Evaluation%' OR CurrentStatus LIKE N'%Opinion%' THEN 1 ELSE 0 END) AS PendingCount,
-                                 SUM(CASE WHEN CurrentStatus = N'Payment Completed' THEN 1 ELSE 0 END) AS CompletedTenders
-                          FROM dbo.Tender WHERE IsDeleted = 0;", connection))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                                 SUM(CASE WHEN " + TenderStatusBuckets.Approved + @" THEN 1 ELSE 0 END) AS ApprovedTenders,
+                                 SUM(CASE WHEN " + TenderStatusBuckets.Pending + @" THEN 1 ELSE 0 END) AS PendingCount,
+                                 SUM(CASE WHEN " + TenderStatusBuckets.Rejected + @" THEN 1 ELSE 0 END) AS RejectedTenders,
+                                 SUM(CASE WHEN " + TenderStatusBuckets.UnderReview + @" THEN 1 ELSE 0 END) AS UnderReviewTenders
+                          FROM dbo.Tender t WHERE t.IsDeleted=0" + ownerFilter + ";", connection))
                     {
-                        if (reader.Read())
+                        if (isRespOfficer)
+                            ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                        using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            TotalTenders.Text = Convert.ToString(reader["TotalTenders"]);
-                            PublishedTenders.Text = Convert.ToString(reader["PublishedTenders"] == DBNull.Value ? 0 : reader["PublishedTenders"]);
-                            PendingCount.Text = Convert.ToString(reader["PendingCount"] == DBNull.Value ? 0 : reader["PendingCount"]);
-                            CompletedTenders.Text = Convert.ToString(reader["CompletedTenders"] == DBNull.Value ? 0 : reader["CompletedTenders"]);
+                            if (reader.Read())
+                            {
+                                TotalTenders.Text = Convert.ToString(reader["TotalTenders"]);
+                                ApprovedTenders.Text = Convert.ToString(reader["ApprovedTenders"] == DBNull.Value ? 0 : reader["ApprovedTenders"]);
+                                PendingCount.Text = Convert.ToString(reader["PendingCount"] == DBNull.Value ? 0 : reader["PendingCount"]);
+                                RejectedTenders.Text = Convert.ToString(reader["RejectedTenders"] == DBNull.Value ? 0 : reader["RejectedTenders"]);
+                                UnderReviewTenders.Text = Convert.ToString(reader["UnderReviewTenders"] == DBNull.Value ? 0 : reader["UnderReviewTenders"]);
+                            }
                         }
                     }
 
-                    using (SqlCommand command = new SqlCommand(
-                        @"SELECT TOP (5) t.TenderId, t.TenderNumber, t.Title, d.DepartmentName, t.CurrentStatus
-                          FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
-                          WHERE t.IsDeleted=0 AND " + RoleStatusFilter(CurrentRole) +
-                        " ORDER BY t.CreatedDate DESC;", connection))
+                    if (!isRespOfficer)
                     {
-                        AddRoleStatusParameters(command, CurrentRole);
-                        PendingGrid.DataSource = ReadTable(command);
-                        PendingGrid.DataBind();
+                        using (SqlCommand command = new SqlCommand(
+                            @"SELECT TOP (5) t.TenderId, t.TenderNumber, t.Title, d.DepartmentName, t.CurrentStatus
+                              FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
+                              WHERE t.IsDeleted=0 AND " + RoleStatusFilter(CurrentRole) +
+                            " ORDER BY t.CreatedDate DESC;", connection))
+                        {
+                            AddRoleStatusParameters(command, CurrentRole);
+                            PendingGrid.DataSource = ReadTable(command);
+                            PendingGrid.DataBind();
+                        }
                     }
 
-                    using (SqlCommand command = new SqlCommand(
-                        @"SELECT TOP (5) t.TenderId, t.TenderNumber, t.Title, d.DepartmentName, t.CurrentStatus, t.CreatedDate
-                          FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
-                          WHERE t.IsDeleted=0 ORDER BY t.CreatedDate DESC;", connection))
-                    {
-                        RecentGrid.DataSource = ReadTable(command);
-                        RecentGrid.DataBind();
-                    }
+                    BindDashboardTables(connection, isRespOfficer, ownerFilter);
                 }
             }
             catch (SqlException ex)
             {
                 Trace.Warn("DepartmentModule", "Could not load the department dashboard.", ex);
                 Message.Text = "<div class=\"message\">Dashboard data could not be loaded. Please retry or contact support.</div>";
+            }
+        }
+
+        private void BindDashboardTables(SqlConnection connection, bool isRespOfficer, string ownerFilter)
+        {
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT TOP (5) t.TenderId, t.TenderNumber, t.Title, t.TenderType, d.DepartmentName,
+                         COALESCE(u.FullName,N'') AS AssignedOfficer,
+                         (SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
+                          WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
+                         t.SubmissionStartDate,t.SubmissionDeadline,t.CurrentStatus,t.CreatedDate
+                  FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
+                  LEFT JOIN dbo.Users u ON u.UserId=t.CreatedBy
+                  WHERE t.IsDeleted=0" + ownerFilter + " ORDER BY t.CreatedDate DESC;", connection))
+            {
+                if (isRespOfficer)
+                    ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                RecentGrid.DataSource = ReadTable(command);
+                RecentGrid.DataBind();
+            }
+
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT t.TenderType AS Category,COUNT(*) AS TenderCount
+                  FROM dbo.Tender t WHERE t.IsDeleted=0" + ownerFilter +
+                " GROUP BY t.TenderType ORDER BY TenderCount DESC,t.TenderType;", connection))
+            {
+                if (isRespOfficer)
+                    ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                CategoryStatsGrid.DataSource = ReadTable(command);
+                CategoryStatsGrid.DataBind();
+            }
+
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,t.SubmissionStartDate,t.SubmissionDeadline,
+                         COALESCE(u.FullName,N'') AS AssignedOfficer,
+                         d.DepartmentName,t.CurrentStatus
+                  FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
+                  LEFT JOIN dbo.Users u ON u.UserId=t.CreatedBy
+                  WHERE t.IsDeleted=0 AND t.SubmissionDeadline>=SYSUTCDATETIME()
+                    AND t.CurrentStatus<>N'Draft'" + ownerFilter +
+                " ORDER BY t.SubmissionDeadline,t.TenderId;", connection))
+            {
+                if (isRespOfficer)
+                    ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                UpcomingGrid.DataSource = ReadTable(command);
+                UpcomingGrid.DataBind();
             }
         }
 

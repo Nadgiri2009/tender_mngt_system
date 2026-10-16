@@ -140,6 +140,24 @@ namespace TenderManagement.API.Controllers
         /// <summary>GET /api/roles</summary>
         [HttpGet]
         public async Task<IActionResult> GetAll() => Ok(await _unitOfWork.Roles.GetAllAsync());
+
+        /// <summary>GET /api/roles/registration - returns only the self-registration role</summary>
+        [AllowAnonymous]
+        [HttpGet("registration")]
+        public async Task<IActionResult> GetRegistrationRole()
+        {
+            var contractorRoles = await _unitOfWork.Roles.FindAsync(
+                role => role.RoleName == RoleNames.Contractor);
+            var contractorRole = contractorRoles.FirstOrDefault();
+            return contractorRole is null
+                ? NotFound(new { message = "Contractor registration is not configured." })
+                : Ok(new
+                {
+                    contractorRole.RoleId,
+                    contractorRole.RoleName,
+                    contractorRole.Description
+                });
+        }
     }
 
     [ApiController]

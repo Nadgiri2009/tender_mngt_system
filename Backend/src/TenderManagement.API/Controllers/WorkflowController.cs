@@ -90,7 +90,7 @@ namespace TenderManagement.API.Controllers
             // for simplicity we accept either roleId query param or infer from claims downstream.
             var roleIdClaim = User.FindFirst("roleId")?.Value;
             var roleId = int.TryParse(roleIdClaim, out var rid) ? rid : 0;
-            var result = await _workflowService.GetPendingApprovalsForRoleAsync(roleId);
+            var result = await _workflowService.GetPendingApprovalsForRoleAsync(roleId, User.GetUserId());
             return Ok(result);
         }
     }

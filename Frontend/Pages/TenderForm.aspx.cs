@@ -20,7 +20,7 @@ namespace DepartmentModule.Pages
         protected DropDownList DepartmentSelect;
         protected DropDownList TenderTypeSelect;
         protected TextBox AmountText;
-        protected TextBox DeadlineText;
+        protected TextBox StartText, DeadlineText;
         protected FileUpload Attachments;
         protected Button CreateButton;
         protected Panel DepartmentPanel, AttachmentPanel;
@@ -88,7 +88,7 @@ namespace DepartmentModule.Pages
         {
             using (SqlConnection connection = ModuleDb.OpenConnection())
             using (SqlCommand command = new SqlCommand(
-                @"SELECT Title,Description,EstimatedAmount,TenderType,SubmissionDeadline,CurrentStatus
+                @"SELECT Title,Description,EstimatedAmount,TenderType,SubmissionStartDate,SubmissionDeadline,CurrentStatus
                   FROM dbo.Tender WHERE TenderId=@TenderId AND IsDeleted=0;", connection))
             {
                 ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, EditingTenderId);
@@ -114,6 +114,9 @@ namespace DepartmentModule.Pages
                     if (TenderTypeSelect.Items.FindByValue(tenderType) == null)
                         TenderTypeSelect.Items.Add(new ListItem(tenderType, tenderType));
                     TenderTypeSelect.SelectedValue = tenderType;
+                    StartText.Text = reader["SubmissionStartDate"] == DBNull.Value
+                        ? String.Empty
+                        : Convert.ToDateTime(reader["SubmissionStartDate"]).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
                     DeadlineText.Text = reader["SubmissionDeadline"] == DBNull.Value
                         ? String.Empty
                         : Convert.ToDateTime(reader["SubmissionDeadline"]).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
@@ -142,7 +145,9 @@ namespace DepartmentModule.Pages
 
             decimal amount;
             int departmentId = 0;
+            DateTime start;
             DateTime deadline;
+            DateTime? submissionStart = null;
             DateTime? submissionDeadline = null;
             if (!Decimal.TryParse(AmountText.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out amount) || amount <= 0 ||
                 (EditingTenderId == 0 && (!Int32.TryParse(DepartmentSelect.SelectedValue, out departmentId) || departmentId <= 0)) ||
@@ -165,10 +170,25 @@ namespace DepartmentModule.Pages
                 }
                 submissionDeadline = deadline;
             }
+            if (!String.IsNullOrWhiteSpace(StartText.Text))
+            {
+                if (!DateTime.TryParse(StartText.Text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out start))
+                {
+                    ShowError("Enter a valid submission start date.");
+                    return;
+                }
+                submissionStart = start;
+            }
+            if (submissionStart.HasValue &&
+                (!submissionDeadline.HasValue || submissionStart.Value > submissionDeadline.Value))
+            {
+                ShowError("The submission start date must be on or before the submission deadline.");
+                return;
+            }
 
             if (EditingTenderId > 0)
             {
-                UpdateDraftTender(amount, submissionDeadline);
+                UpdateDraftTender(amount, submissionStart, submissionDeadline);
                 return;
             }
 
@@ -207,8 +227,8 @@ namespace DepartmentModule.Pages
                     }
 
                     using (SqlCommand command = new SqlCommand(
-                        @"INSERT INTO dbo.Tender (TenderNumber, TrackingId, Title, Description, DepartmentId, EstimatedAmount, TenderType, CurrentStatus, SubmissionDeadline, CreatedBy)
-                          VALUES (@TenderNumber, @TrackingId, @Title, @Description, @DepartmentId, @Amount, @TenderType, N'Draft', @Deadline, @CreatedBy);
+                        @"INSERT INTO dbo.Tender (TenderNumber, TrackingId, Title, Description, DepartmentId, EstimatedAmount, TenderType, CurrentStatus, SubmissionStartDate, SubmissionDeadline, CreatedBy)
+                          VALUES (@TenderNumber, @TrackingId, @Title, @Description, @DepartmentId, @Amount, @TenderType, N'Draft', @StartDate, @Deadline, @CreatedBy);
                           SELECT CAST(SCOPE_IDENTITY() AS int);", connection, transaction))
                     {
                         AddText(command, "@TenderNumber", SqlDbType.NVarChar, tenderNumber, 50);
@@ -218,6 +238,8 @@ namespace DepartmentModule.Pages
                         ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int, departmentId);
                         ModuleDb.AddParameter(command, "@Amount", SqlDbType.Decimal, amount);
                         AddText(command, "@TenderType", SqlDbType.NVarChar, TenderTypeSelect.SelectedValue, 50);
+                        ModuleDb.AddParameter(command, "@StartDate", SqlDbType.DateTime2,
+                            submissionStart.HasValue ? (object)submissionStart.Value : null);
                         ModuleDb.AddParameter(command, "@Deadline", SqlDbType.DateTime2, submissionDeadline.HasValue ? (object)submissionDeadline.Value : null);
                         ModuleDb.AddParameter(command, "@CreatedBy", SqlDbType.Int, CurrentUserId);
                         tenderId = Convert.ToInt32(command.ExecuteScalar());
@@ -270,7 +292,7 @@ namespace DepartmentModule.Pages
             }
         }
 
-        private void UpdateDraftTender(decimal amount, DateTime? submissionDeadline)
+        private void UpdateDraftTender(decimal amount, DateTime? submissionStart, DateTime? submissionDeadline)
         {
             try
             {
@@ -279,13 +301,16 @@ namespace DepartmentModule.Pages
                 using (SqlCommand command = new SqlCommand(
                     @"UPDATE dbo.Tender
                       SET Title=@Title,Description=@Description,EstimatedAmount=@Amount,TenderType=@TenderType,
-                          SubmissionDeadline=@Deadline,ModifiedBy=@ModifiedBy,ModifiedDate=SYSUTCDATETIME()
+                          SubmissionStartDate=@StartDate,SubmissionDeadline=@Deadline,
+                          ModifiedBy=@ModifiedBy,ModifiedDate=SYSUTCDATETIME()
                       WHERE TenderId=@TenderId AND CurrentStatus=N'Draft' AND IsDeleted=0;", connection, transaction))
                 {
                     AddText(command, "@Title", SqlDbType.NVarChar, TitleText.Text.Trim(), 250);
                     AddText(command, "@Description", SqlDbType.NVarChar, DescriptionText.Text, -1);
                     ModuleDb.AddParameter(command, "@Amount", SqlDbType.Decimal, amount);
                     AddText(command, "@TenderType", SqlDbType.NVarChar, TenderTypeSelect.SelectedValue, 50);
+                    ModuleDb.AddParameter(command, "@StartDate", SqlDbType.DateTime2,
+                        submissionStart.HasValue ? (object)submissionStart.Value : null);
                     ModuleDb.AddParameter(command, "@Deadline", SqlDbType.DateTime2,
                         submissionDeadline.HasValue ? (object)submissionDeadline.Value : null);
                     ModuleDb.AddParameter(command, "@ModifiedBy", SqlDbType.Int, CurrentUserId);

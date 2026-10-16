@@ -12,26 +12,34 @@ namespace DepartmentModule.Helpers
         protected string CurrentRole { get; private set; }
         protected int? CurrentDepartmentId { get; private set; }
 
+        protected virtual bool RequiresAuthentication
+        {
+            get { return true; }
+        }
+
         protected override void OnInit(EventArgs e)
         {
             string userKey = ConfigurationManager.AppSettings["SessionUserIdKey"] ?? "UserId";
             string roleKey = ConfigurationManager.AppSettings["SessionRoleKey"] ?? "RoleName";
             string departmentKey = ConfigurationManager.AppSettings["SessionDepartmentIdKey"] ?? "DepartmentId";
-            int userId;
+            int userId = 0;
+            bool isAuthenticated = Session != null &&
+                Int32.TryParse(Convert.ToString(Session[userKey]), out userId) &&
+                userId > 0 && !String.IsNullOrWhiteSpace(Convert.ToString(Session[roleKey]));
 
-            if (Session == null || !Int32.TryParse(Convert.ToString(Session[userKey]), out userId) ||
-                userId <= 0 || String.IsNullOrWhiteSpace(Convert.ToString(Session[roleKey])))
+            if (!isAuthenticated && RequiresAuthentication)
             {
                 string loginUrl = ConfigurationManager.AppSettings["DepartmentPanelLoginUrl"] ?? "~/Pages/Error.aspx?code=401";
                 Response.Redirect(ResolveUrl(loginUrl), true);
                 return;
             }
 
-            CurrentUserId = userId;
-            CurrentRole = Convert.ToString(Session[roleKey]);
+            CurrentUserId = isAuthenticated ? userId : 0;
+            CurrentRole = isAuthenticated ? Convert.ToString(Session[roleKey]) : String.Empty;
             ViewStateUserKey = Session.SessionID;
             int departmentId;
-            if (Int32.TryParse(Convert.ToString(Session[departmentKey]), out departmentId) && departmentId > 0)
+            if (isAuthenticated &&
+                Int32.TryParse(Convert.ToString(Session[departmentKey]), out departmentId) && departmentId > 0)
             {
                 CurrentDepartmentId = departmentId;
             }
@@ -61,6 +69,27 @@ namespace DepartmentModule.Helpers
             Response.StatusCode = 403;
             Response.TrySkipIisCustomErrors = true;
             Response.Redirect("~/Pages/Error.aspx?code=403", true);
+            return false;
+        }
+
+        protected bool RequireOwnedTenderForDepartmentOfficer(int tenderId)
+        {
+            if (!HasAnyRole("DepartmentOfficer")) return true;
+
+            using (SqlConnection connection = ModuleDb.OpenConnection())
+            using (SqlCommand command = new SqlCommand(
+                "SELECT COUNT(*) FROM dbo.Tender WHERE TenderId=@TenderId AND CreatedBy=@UserId AND IsDeleted=0;",
+                connection))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", System.Data.SqlDbType.Int, tenderId);
+                ModuleDb.AddParameter(command, "@UserId", System.Data.SqlDbType.Int, CurrentUserId);
+                if (Convert.ToInt32(command.ExecuteScalar()) == 1) return true;
+            }
+
+            Response.StatusCode = 403;
+            Response.TrySkipIisCustomErrors = true;
+            Response.Redirect("~/Pages/Error.aspx?code=403", false);
+            Context.ApplicationInstance.CompleteRequest();
             return false;
         }
 

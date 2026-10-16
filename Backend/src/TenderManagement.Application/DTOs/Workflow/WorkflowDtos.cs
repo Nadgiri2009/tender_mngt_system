@@ -1,5 +1,11 @@
 namespace TenderManagement.Application.DTOs.Workflow
 {
+    public class DashboardCategoryCountDto
+    {
+        public string Category { get; set; } = string.Empty;
+        public int TenderCount { get; set; }
+    }
+
     public class SubmitTenderDto
     {
         public string? Remarks { get; set; }
@@ -48,9 +54,18 @@ namespace TenderManagement.Application.DTOs.Workflow
     public class DashboardStatsDto
     {
         public int TotalTenders { get; set; }
+        public int ApprovedTenders { get; set; }
+        public int PendingTenders { get; set; }
+        public int RejectedTenders { get; set; }
+        public int UnderReviewTenders { get; set; }
         public int PublishedTenders { get; set; }
+        public int DraftTenders { get; set; }
+        public int ClosedExpiredTenders { get; set; }
         public int PendingApprovals { get; set; }
         public int CompletedTenders { get; set; }
         public int MyTenders { get; set; }
+        public List<DashboardCategoryCountDto> CategoryBreakdown { get; set; } = new();
+        public List<TenderManagement.Application.DTOs.Tender.TenderListItemDto> RecentTenders { get; set; } = new();
+        public List<TenderManagement.Application.DTOs.Tender.TenderListItemDto> UpcomingDeadlines { get; set; } = new();
     }
 }

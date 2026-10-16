@@ -23,6 +23,7 @@ namespace TenderManagement.Infrastructure.Repositories
             BOQItems = new GenericRepository<BOQItem>(context);
             Contractors = new GenericRepository<Contractor>(context);
             TechnicalBids = new GenericRepository<TechnicalBid>(context);
+            TechnicalBidDocuments = new GenericRepository<TechnicalBidDocument>(context);
             FinancialBids = new GenericRepository<FinancialBid>(context);
             Agreements = new GenericRepository<Agreement>(context);
             WorkOrders = new GenericRepository<WorkOrder>(context);
@@ -45,6 +46,7 @@ namespace TenderManagement.Infrastructure.Repositories
         public IGenericRepository<BOQItem> BOQItems { get; }
         public IGenericRepository<Contractor> Contractors { get; }
         public IGenericRepository<TechnicalBid> TechnicalBids { get; }
+        public IGenericRepository<TechnicalBidDocument> TechnicalBidDocuments { get; }
         public IGenericRepository<FinancialBid> FinancialBids { get; }
         public IGenericRepository<Agreement> Agreements { get; }
         public IGenericRepository<WorkOrder> WorkOrders { get; }

@@ -22,17 +22,48 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/tenders - paginated, searchable, filterable list</summary>
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll([FromQuery] PaginationQuery query)
         {
-            var result = await _tenderService.GetTendersAsync(query);
+            int? ownerId = null;
+            if (User.IsInRole(RoleNames.DepartmentOfficer))
+            {
+                ownerId = User.GetUserId();
+            }
+            else if (User.Identity?.IsAuthenticated != true || User.IsInRole(RoleNames.Contractor))
+            {
+                query.Status = TenderStatus.TenderPublished;
+            }
+            var result = await _tenderService.GetTendersAsync(query, ownerId);
             return Ok(result);
         }
 
-        /// <summary>GET /api/tenders/{id}</summary>
+        /// <summary>GET /api/tenders/{id} - public users can view published tender notices only</summary>
         [HttpGet("{id:int}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _tenderService.GetTenderByIdAsync(id);
+            var isAuthenticated = User.Identity?.IsAuthenticated == true;
+            var isContractor = User.IsInRole(RoleNames.Contractor);
+            var ownerId = isAuthenticated && User.IsInRole(RoleNames.DepartmentOfficer)
+                ? User.GetUserId()
+                : (int?)null;
+            var result = await _tenderService.GetTenderByIdAsync(
+                id,
+                ownerId,
+                allowPublishedForOtherOwners: isAuthenticated && ownerId.HasValue);
+            if ((!isAuthenticated || isContractor) && result.CurrentStatus != TenderStatus.TenderPublished)
+            {
+                return NotFound();
+            }
+
+            if (!isAuthenticated || isContractor)
+            {
+                result.AssignedRespOfficer = string.Empty;
+                result.AssignedRole = null;
+                result.CreatedByName = string.Empty;
+            }
+
             return Ok(result);
         }
 

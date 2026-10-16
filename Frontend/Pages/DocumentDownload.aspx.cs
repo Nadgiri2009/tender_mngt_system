@@ -9,6 +9,11 @@ namespace DepartmentModule.Pages
 {
     public partial class DocumentDownload : ModulePage
     {
+        protected override bool RequiresAuthentication
+        {
+            get { return false; }
+        }
+
         protected void Page_Load(object sender, EventArgs e)
         {
             int documentId = QueryId("id");
@@ -19,9 +24,21 @@ namespace DepartmentModule.Pages
             {
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 using (SqlCommand command = new SqlCommand(
-                    @"SELECT FilePath,FileName FROM dbo.TenderDocuments WHERE DocumentId=@DocumentId;", connection))
+                    @"SELECT td.FilePath,td.FileName
+                      FROM dbo.TenderDocuments td
+                      INNER JOIN dbo.Tender t ON t.TenderId=td.TenderId
+                      WHERE td.DocumentId=@DocumentId AND t.IsDeleted=0
+                        AND (
+                            ((@CurrentUserId=0 OR @CurrentRole=N'Contractor') AND EXISTS
+                                (SELECT 1 FROM dbo.ApprovalHistory publicHistory
+                                 WHERE publicHistory.TenderId=t.TenderId AND publicHistory.NewStatus=N'Tender Published'))
+                            OR (@CurrentUserId>0 AND @CurrentRole<>N'Contractor'
+                                AND (@CurrentRole<>N'DepartmentOfficer' OR t.CreatedBy=@CurrentUserId))
+                        );", connection))
                 {
                     ModuleDb.AddParameter(command, "@DocumentId", SqlDbType.Int, documentId);
+                    ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                    ModuleDb.AddParameter(command, "@CurrentRole", SqlDbType.NVarChar, CurrentRole, 50);
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         if (!reader.Read()) { NotFound(); return; }

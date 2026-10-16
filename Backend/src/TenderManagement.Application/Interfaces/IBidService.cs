@@ -4,7 +4,12 @@ namespace TenderManagement.Application.Interfaces
 {
     public interface IBidService
     {
-        Task<TechnicalBidDto> SubmitTechnicalBidAsync(SubmitTechnicalBidDto dto);
+        Task<TechnicalBidDto> SubmitTechnicalBidAsync(SubmitTechnicalBidDto dto, int currentUserId, bool isAdmin);
+        Task<TenderApplicationDto> SubmitApplicationAsync(
+            int tenderId,
+            int userId,
+            string termsVersion,
+            IReadOnlyList<(string FileName, Stream Content)> files);
         Task<TechnicalBidDto> EvaluateTechnicalBidAsync(EvaluateTechnicalBidDto dto, int currentUserId);
         Task<List<TechnicalBidDto>> GetTechnicalBidsAsync(int tenderId);
 

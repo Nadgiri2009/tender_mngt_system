@@ -11,18 +11,25 @@ namespace DepartmentModule.Pages
 {
     public partial class TenderDetails : ModulePage
     {
+        protected override bool RequiresAuthentication
+        {
+            get { return false; }
+        }
+
         protected Literal PageTitle, TenderTitle, TenderNumber, DepartmentName, Description, TenderType, EstimatedAmount;
-        protected Literal SubmissionDeadline, CreatedBy, CreatedDate, CurrentStatus, Message;
+        protected Literal PublicationDate, SubmissionStartDate, SubmissionDeadline, CreatedBy, CreatedDate,
+            CurrentStatus, Message, ApplicationMessage;
         protected GridView BoqGrid, DocumentsGrid, HistoryGrid;
-        protected Panel AddBoqPanel, UploadPanel;
+        protected Panel AddBoqPanel, UploadPanel, AuthenticatedWorkflowPanel;
         protected TextBox ItemName, ItemDescription, Quantity, Unit, Rate, Remarks;
         protected FileUpload DocumentFile;
         protected Button AddBoqButton, UploadButton, SubmitWorkflowButton, ApproveButton, RejectButton;
         protected Button DeleteTenderButton;
-        protected HyperLink BidsLink, WorkLink, EditTenderLink;
+        protected HyperLink BidsLink, WorkLink, EditTenderLink, ApplyTenderLink;
         private int TenderId { get { return QueryId("id"); } }
         private string TenderStatus { get; set; }
         private bool IsDraft { get; set; }
+        private bool IsAuthorizedTender { get; set; }
 
         protected void Page_Load(object sender, EventArgs e)
         {
@@ -43,12 +50,23 @@ namespace DepartmentModule.Pages
                 {
                     using (SqlCommand command = new SqlCommand(
                         @"SELECT t.TenderId,t.TenderNumber,t.Title,t.Description,t.TenderType,t.EstimatedAmount,t.CurrentStatus,
-                                 t.SubmissionDeadline,t.CreatedDate,d.DepartmentName,u.FullName
+                                 (SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
+                                  WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
+                                 t.SubmissionStartDate,t.SubmissionDeadline,t.CreatedDate,d.DepartmentName,u.FullName
                           FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
                           INNER JOIN dbo.Users u ON u.UserId=t.CreatedBy
-                          WHERE t.TenderId=@TenderId AND t.IsDeleted=0;", connection))
+                          WHERE t.TenderId=@TenderId AND t.IsDeleted=0
+                            AND (
+                                ((@CurrentUserId=0 OR @CurrentRole=N'Contractor') AND EXISTS
+                                    (SELECT 1 FROM dbo.ApprovalHistory publicHistory
+                                     WHERE publicHistory.TenderId=t.TenderId AND publicHistory.NewStatus=N'Tender Published'))
+                                OR (@CurrentUserId>0 AND @CurrentRole<>N'Contractor'
+                                    AND (@CurrentRole<>N'DepartmentOfficer' OR t.CreatedBy=@CurrentUserId))
+                            );", connection))
                     {
                         ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                        ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                        ModuleDb.AddParameter(command, "@CurrentRole", SqlDbType.NVarChar, CurrentRole, 50);
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
                             if (!reader.Read())
@@ -57,6 +75,7 @@ namespace DepartmentModule.Pages
                                 Context.ApplicationInstance.CompleteRequest();
                                 return;
                             }
+                            IsAuthorizedTender = true;
                             TenderNumber.Text = PageTitle.Text = ModuleDb.Html(reader["TenderNumber"]);
                             TenderTitle.Text = ModuleDb.Html(reader["Title"]);
                             DepartmentName.Text = ModuleDb.Html(reader["DepartmentName"]);
@@ -65,6 +84,8 @@ namespace DepartmentModule.Pages
                             EstimatedAmount.Text = Convert.ToDecimal(reader["EstimatedAmount"]).ToString("N2", CultureInfo.CurrentCulture);
                             TenderStatus = Convert.ToString(reader["CurrentStatus"]);
                             CurrentStatus.Text = ModuleDb.Html(TenderStatus);
+                            PublicationDate.Text = reader["PublicationDate"] == DBNull.Value ? "—" : Convert.ToDateTime(reader["PublicationDate"]).ToString("dd MMM yyyy", CultureInfo.CurrentCulture);
+                            SubmissionStartDate.Text = reader["SubmissionStartDate"] == DBNull.Value ? "—" : Convert.ToDateTime(reader["SubmissionStartDate"]).ToString("dd MMM yyyy HH:mm", CultureInfo.CurrentCulture);
                             SubmissionDeadline.Text = reader["SubmissionDeadline"] == DBNull.Value ? "—" : Convert.ToDateTime(reader["SubmissionDeadline"]).ToString("dd MMM yyyy HH:mm", CultureInfo.CurrentCulture);
                             CreatedBy.Text = ModuleDb.Html(reader["FullName"]);
                             CreatedDate.Text = Convert.ToDateTime(reader["CreatedDate"]).ToString("dd MMM yyyy", CultureInfo.CurrentCulture);
@@ -73,11 +94,32 @@ namespace DepartmentModule.Pages
                     BindChildTables(connection);
                 }
                 IsDraft = String.Equals(TenderStatus, "Draft", StringComparison.OrdinalIgnoreCase);
+                AuthenticatedWorkflowPanel.Visible = CurrentUserId > 0;
                 EditTenderLink.Visible = IsDraft && HasAnyRole("Admin");
                 EditTenderLink.NavigateUrl = "~/Pages/TenderForm.aspx?id=" + TenderId.ToString(CultureInfo.InvariantCulture);
                 DeleteTenderButton.Visible = IsDraft && HasAnyRole("Admin");
                 AddBoqPanel.Visible = IsDraft && HasAnyRole("DepartmentOfficer", "Admin");
                 UploadPanel.Visible = HasAnyRole("DepartmentOfficer", "Admin");
+                bool acceptingBids = String.Equals(
+                    TenderStatus, "Tender Published", StringComparison.OrdinalIgnoreCase);
+                ApplyTenderLink.Visible = acceptingBids &&
+                    (CurrentUserId == 0 || HasAnyRole("Contractor"));
+                ApplicationMessage.Text = String.Empty;
+                if (!acceptingBids)
+                {
+                    ApplicationMessage.Text = "<p class=\"muted\">Bid submission is not currently open for this tender.</p>";
+                }
+                else if (CurrentUserId > 0 && !HasAnyRole("Contractor"))
+                {
+                    ApplicationMessage.Text = "<div class=\"message\">A contractor account is required to submit a bid.</div>";
+                }
+                if (ApplyTenderLink.Visible)
+                {
+                    ApplyTenderLink.NavigateUrl = CurrentUserId == 0
+                        ? "~/Pages/Login.aspx?applyTenderId=" + TenderId.ToString(CultureInfo.InvariantCulture)
+                        : "~/Pages/Bids.aspx?tenderId=" + TenderId.ToString(CultureInfo.InvariantCulture);
+                    ApplyTenderLink.Text = CurrentUserId == 0 ? "Sign in to apply" : "Apply for this tender";
+                }
                 BoqGrid.Columns[6].Visible = AddBoqPanel.Visible;
                 WorkflowTransition transition = WorkflowRules.ForStatus(TenderStatus);
                 SubmitWorkflowButton.Visible = transition != null && transition.SubmitRoles.Length > 0 && WorkflowRules.RoleAllowed(transition.SubmitRoles, CurrentRole);
@@ -120,6 +162,7 @@ namespace DepartmentModule.Pages
 
         protected void AddBoqButton_Click(object sender, EventArgs e)
         {
+            if (!RequireTenderAccess()) return;
             if (!HasAnyRole("DepartmentOfficer", "Admin") || !String.Equals(TenderStatus, "Draft", StringComparison.OrdinalIgnoreCase))
             {
                 ShowError("BOQ items can only be added to a draft tender by department staff.");
@@ -166,6 +209,7 @@ namespace DepartmentModule.Pages
         protected void BoqGrid_RowCommand(object sender, GridViewCommandEventArgs e)
         {
             if (e.CommandName != "RemoveItem") return;
+            if (!RequireTenderAccess()) return;
             int boqId;
             if (!Int32.TryParse(Convert.ToString(e.CommandArgument), out boqId) || boqId <= 0 ||
                 !HasAnyRole("DepartmentOfficer", "Admin") || !String.Equals(TenderStatus, "Draft", StringComparison.OrdinalIgnoreCase))
@@ -198,6 +242,7 @@ namespace DepartmentModule.Pages
 
         protected void UploadButton_Click(object sender, EventArgs e)
         {
+            if (!RequireTenderAccess()) return;
             if (!HasAnyRole("DepartmentOfficer", "Admin") || !DocumentFile.HasFile)
             {
                 ShowError("Select an attachment to upload.");
@@ -257,6 +302,7 @@ namespace DepartmentModule.Pages
 
         protected void DeleteTenderButton_Click(object sender, EventArgs e)
         {
+            if (!RequireTenderAccess()) return;
             if (!HasAnyRole("Admin") || !String.Equals(TenderStatus, "Draft", StringComparison.OrdinalIgnoreCase))
             {
                 ShowError("Only an administrator can delete a draft tender.");
@@ -300,12 +346,14 @@ namespace DepartmentModule.Pages
 
         private void SaveTransition(string action)
         {
+            if (!RequireTenderAccess()) return;
             WorkflowTransition transition = WorkflowRules.ForStatus(TenderStatus);
             if (transition == null)
             {
                 ShowError("No workflow action is available for the current status.");
                 return;
             }
+
             bool isSubmit = action == "Submitted";
             string[] allowedRoles = isSubmit ? transition.SubmitRoles : transition.ApproverRoles;
             if (allowedRoles.Length == 0 || !WorkflowRules.RoleAllowed(allowedRoles, CurrentRole))
@@ -374,6 +422,15 @@ namespace DepartmentModule.Pages
             {
                 ShowError(ex.Message);
             }
+        }
+
+        private bool RequireTenderAccess()
+        {
+            if (IsAuthorizedTender) return true;
+            Response.StatusCode = 403;
+            Response.TrySkipIisCustomErrors = true;
+            ShowError("You are not authorized to access this tender.");
+            return false;
         }
 
         private void ShowError(string text)

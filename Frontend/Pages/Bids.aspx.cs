@@ -24,6 +24,7 @@ namespace DepartmentModule.Pages
         protected void Page_Load(object sender, EventArgs e)
         {
             if (TenderId <= 0) { Response.Redirect("~/Pages/Tenders.aspx", false); Context.ApplicationInstance.CompleteRequest(); return; }
+            if (!RequireOwnedTenderForDepartmentOfficer(TenderId)) return;
             if (!IsPostBack) LoadPage();
         }
 

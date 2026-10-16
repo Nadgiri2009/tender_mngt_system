@@ -92,6 +92,7 @@ CREATE TABLE dbo.Tender (
     EstimatedAmount    DECIMAL(18,2)  NOT NULL DEFAULT 0,
     TenderType         NVARCHAR(50)   NOT NULL,
     CurrentStatus      NVARCHAR(50)   NOT NULL DEFAULT 'Draft',
+    SubmissionStartDate DATETIME2     NULL,
     SubmissionDeadline DATETIME2      NULL,
     CreatedBy          INT            NOT NULL,
     CreatedDate        DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -190,9 +191,22 @@ CREATE TABLE dbo.TechnicalBid (
     EvaluatedBy     INT            NULL,
     SubmittedDate   DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
     EvaluatedDate   DATETIME2      NULL,
+    TermsAcceptedAt DATETIME2      NULL,
+    TermsVersion    NVARCHAR(50)   NULL,
     CONSTRAINT FK_TechnicalBid_Tender FOREIGN KEY (TenderId) REFERENCES dbo.Tender(TenderId) ON DELETE CASCADE,
     CONSTRAINT FK_TechnicalBid_Contractor FOREIGN KEY (ContractorId) REFERENCES dbo.Contractors(ContractorId),
     CONSTRAINT UQ_TechnicalBid_Tender_Contractor UNIQUE (TenderId, ContractorId)
+);
+GO
+
+CREATE TABLE dbo.TechnicalBidDocuments (
+    TechnicalBidDocumentId INT IDENTITY(1,1) PRIMARY KEY,
+    TechnicalBidId         INT            NOT NULL,
+    FileName               NVARCHAR(260)  NOT NULL,
+    FilePath               NVARCHAR(400)  NOT NULL,
+    UploadedDate           DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_TechnicalBidDocuments_TechnicalBid
+        FOREIGN KEY (TechnicalBidId) REFERENCES dbo.TechnicalBid(TechnicalBidId) ON DELETE CASCADE
 );
 GO
 

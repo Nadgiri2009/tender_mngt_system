@@ -5,12 +5,14 @@
         <div><h1><asp:Literal ID="TenderTitle" runat="server" /></h1>
             <div class="muted"><asp:Literal ID="TenderNumber" runat="server" /> · <asp:Literal ID="DepartmentName" runat="server" /></div></div>
         <div class="row">
+            <asp:HyperLink ID="ApplyTenderLink" runat="server" CssClass="button" Visible="false">Apply for this tender</asp:HyperLink>
             <asp:HyperLink ID="EditTenderLink" runat="server" CssClass="button secondary" Visible="false">Edit draft</asp:HyperLink>
             <asp:Button ID="DeleteTenderButton" runat="server" Text="Delete draft" CssClass="button danger" Visible="false"
                 OnClick="DeleteTenderButton_Click" OnClientClick="return confirm('Delete this draft tender? This action cannot be undone.');" />
             <a href="Tenders.aspx" class="button secondary">Back to tenders</a>
         </div>
     </div>
+    <asp:Literal ID="ApplicationMessage" runat="server" />
     <asp:Literal ID="Message" runat="server" />
     <section class="card">
         <h2>Details</h2>
@@ -18,6 +20,8 @@
         <div class="row">
             <p><strong>Tender Type</strong><br /><asp:Literal ID="TenderType" runat="server" /></p>
             <p><strong>Estimated Cost</strong><br />₹<asp:Literal ID="EstimatedAmount" runat="server" /></p>
+            <p><strong>Publication Date</strong><br /><asp:Literal ID="PublicationDate" runat="server" /></p>
+            <p><strong>Submission Start Date</strong><br /><asp:Literal ID="SubmissionStartDate" runat="server" /></p>
             <p><strong>Submission Deadline</strong><br /><asp:Literal ID="SubmissionDeadline" runat="server" /></p>
             <p><strong>Created By</strong><br /><asp:Literal ID="CreatedBy" runat="server" /></p>
             <p><strong>Created Date</strong><br /><asp:Literal ID="CreatedDate" runat="server" /></p>
@@ -68,32 +72,34 @@
             <span class="help">PDF, Office documents, JPEG, or PNG; maximum 20 MB.</span>
         </asp:Panel>
     </section>
-    <section class="card">
-        <h2>Workflow action</h2>
-        <div class="field"><label for="Remarks">Remarks (optional)</label><asp:TextBox ID="Remarks" runat="server" TextMode="MultiLine" MaxLength="1000" Rows="3" /></div>
-        <div class="row">
-            <asp:Button ID="SubmitWorkflowButton" runat="server" Text="Submit / Forward" OnClick="SubmitWorkflowButton_Click" />
-            <asp:Button ID="ApproveButton" runat="server" Text="Approve" OnClick="ApproveButton_Click" />
-            <asp:Button ID="RejectButton" runat="server" Text="Reject" CssClass="button danger" OnClick="RejectButton_Click" />
-        </div>
-        <p class="help">Workflow status changes are validated against the current status and the signed-in role before being saved.</p>
-    </section>
-    <section class="card">
-        <div class="page-heading"><h2>Workflow history</h2>
-            <asp:HyperLink ID="BidsLink" runat="server" CssClass="button secondary">Review bids</asp:HyperLink>
-            <asp:HyperLink ID="WorkLink" runat="server" CssClass="button secondary">Work management</asp:HyperLink>
-        </div>
-        <div class="table-wrap"><asp:GridView ID="HistoryGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No workflow actions have been recorded.">
-            <Columns>
-                <asp:BoundField DataField="ApprovalStage" HeaderText="Stage" />
-                <asp:BoundField DataField="PreviousStatus" HeaderText="Previous status" />
-                <asp:BoundField DataField="NewStatus" HeaderText="New status" />
-                <asp:BoundField DataField="Status" HeaderText="Action" />
-                <asp:BoundField DataField="ActionTakenBy" HeaderText="Action taken by" />
-                <asp:BoundField DataField="RoleAtAction" HeaderText="Role" />
-                <asp:BoundField DataField="Remarks" HeaderText="Remarks" />
-                <asp:BoundField DataField="ApprovalDate" HeaderText="Date" DataFormatString="{0:dd MMM yyyy HH:mm}" />
-            </Columns>
-        </asp:GridView></div>
-    </section>
+    <asp:Panel ID="AuthenticatedWorkflowPanel" runat="server">
+        <section class="card">
+            <h2>Workflow action</h2>
+            <div class="field"><label for="Remarks">Remarks (optional)</label><asp:TextBox ID="Remarks" runat="server" TextMode="MultiLine" MaxLength="1000" Rows="3" /></div>
+            <div class="row">
+                <asp:Button ID="SubmitWorkflowButton" runat="server" Text="Submit / Forward" OnClick="SubmitWorkflowButton_Click" />
+                <asp:Button ID="ApproveButton" runat="server" Text="Approve" OnClick="ApproveButton_Click" />
+                <asp:Button ID="RejectButton" runat="server" Text="Reject" CssClass="button danger" OnClick="RejectButton_Click" />
+            </div>
+            <p class="help">Workflow status changes are validated against the current status and the signed-in role before being saved.</p>
+        </section>
+        <section class="card">
+            <div class="page-heading"><h2>Workflow history</h2>
+                <asp:HyperLink ID="BidsLink" runat="server" CssClass="button secondary">Review bids</asp:HyperLink>
+                <asp:HyperLink ID="WorkLink" runat="server" CssClass="button secondary">Work management</asp:HyperLink>
+            </div>
+            <div class="table-wrap"><asp:GridView ID="HistoryGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No workflow actions have been recorded.">
+                <Columns>
+                    <asp:BoundField DataField="ApprovalStage" HeaderText="Stage" />
+                    <asp:BoundField DataField="PreviousStatus" HeaderText="Previous status" />
+                    <asp:BoundField DataField="NewStatus" HeaderText="New status" />
+                    <asp:BoundField DataField="Status" HeaderText="Action" />
+                    <asp:BoundField DataField="ActionTakenBy" HeaderText="Action taken by" />
+                    <asp:BoundField DataField="RoleAtAction" HeaderText="Role" />
+                    <asp:BoundField DataField="Remarks" HeaderText="Remarks" />
+                    <asp:BoundField DataField="ApprovalDate" HeaderText="Date" DataFormatString="{0:dd MMM yyyy HH:mm}" />
+                </Columns>
+            </asp:GridView></div>
+        </section>
+    </asp:Panel>
 </asp:Content>

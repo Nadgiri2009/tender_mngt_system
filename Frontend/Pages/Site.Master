@@ -5,30 +5,81 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><asp:ContentPlaceHolder ID="TitleContent" runat="server">Department Tender Management</asp:ContentPlaceHolder></title>
-    <link href="<%= ResolveUrl("~/Content/Styles.css") %>" rel="stylesheet" />
+    <link href="<%= ResolveUrl("~/Content/Styles.css?v=20261013-dashboard-spacing") %>" rel="stylesheet" />
     <asp:ContentPlaceHolder ID="HeadContent" runat="server" />
 </head>
 <body>
     <form id="ModuleForm" runat="server">
-        <header class="topbar">
-            <a class="brand" href="<%= ResolveUrl("~/Pages/Home.aspx") %>">Solapur Municipal Corporation <span>Tender Management System</span></a>
-            <nav aria-label="Primary navigation">
-                <a href="<%= ResolveUrl("~/Pages/Home.aspx") %>">Home</a>
-                <a href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>">Tenders</a>
-                <a href="<%= ResolveUrl("~/Pages/Home.aspx#announcements") %>">Notices</a>
-                <asp:HyperLink ID="DashboardLink" runat="server" NavigateUrl="~/Pages/Default.aspx" Visible="false">Dashboard</asp:HyperLink>
-                <asp:HyperLink ID="ApprovalsLink" runat="server" NavigateUrl="~/Pages/Approvals.aspx" Visible="false">Approvals</asp:HyperLink>
-                <asp:HyperLink ID="AdminLink" runat="server" NavigateUrl="~/Pages/Admin.aspx" Visible="false">Administration</asp:HyperLink>
-                <asp:HyperLink ID="LoginLink" runat="server" NavigateUrl="~/Pages/Login.aspx">Login</asp:HyperLink>
-                <asp:HyperLink ID="RegisterLink" runat="server" NavigateUrl="~/Pages/Register.aspx">Register</asp:HyperLink>
-                <asp:Literal ID="CurrentUser" runat="server" />
-                <asp:LinkButton ID="SignOutLink" runat="server" OnClick="SignOutLink_Click" Visible="false">Sign out</asp:LinkButton>
-            </nav>
-        </header>
-        <main class="container">
-            <asp:ContentPlaceHolder ID="MainContent" runat="server" />
-        </main>
-        <footer class="footer">Solapur Municipal Corporation · Official e-Tender Portal</footer>
+        <div id="AppLayout" runat="server" class="app-shell public-layout">
+            <aside id="AdminSidebar" runat="server" class="sidebar" visible="false">
+                <div class="sidebar-heading">Tender Management <span>Main Administrator</span></div>
+                <nav class="side-nav" aria-label="Administration navigation">
+                    <asp:HyperLink ID="AdminDashboardLink" runat="server" NavigateUrl="~/Pages/Admin.aspx">Dashboard</asp:HyperLink>
+                    <asp:HyperLink ID="AdminUsersLink" runat="server" NavigateUrl="~/Pages/AdminUsers.aspx">Users and contractors</asp:HyperLink>
+                    <asp:HyperLink ID="AdminTendersLink" runat="server" NavigateUrl="~/Pages/Tenders.aspx">Tender management</asp:HyperLink>
+                    <asp:HyperLink ID="AdminCreateTenderLink" runat="server" NavigateUrl="~/Pages/TenderForm.aspx">Create tender</asp:HyperLink>
+                    <asp:HyperLink ID="ApprovalsLink" runat="server" NavigateUrl="~/Pages/Approvals.aspx">Approvals</asp:HyperLink>
+                    <asp:HyperLink ID="AdminDepartmentsLink" runat="server" NavigateUrl="~/Pages/AdminDepartments.aspx">Departments</asp:HyperLink>
+                    <asp:HyperLink ID="AdminAnnouncementsLink" runat="server" NavigateUrl="~/Pages/AdminAnnouncements.aspx">Announcements</asp:HyperLink>
+                    <asp:HyperLink ID="AdminReportsLink" runat="server" NavigateUrl="~/Pages/AdminReports.aspx">Reports</asp:HyperLink>
+                    <asp:HyperLink ID="AdminAuditLink" runat="server" NavigateUrl="~/Pages/AdminAudit.aspx">Audit logs</asp:HyperLink>
+                </nav>
+                <div class="sidebar-account">
+                    <asp:Literal ID="CurrentUser" runat="server" />
+                    <asp:LinkButton ID="SignOutLink" runat="server" CssClass="side-nav-link signout-link" OnClick="SignOutLink_Click" Visible="false">Sign out</asp:LinkButton>
+                </div>
+            </aside>
+            <button type="button" id="SidebarScrim" class="sidebar-scrim" aria-label="Close navigation menu" tabindex="-1"></button>
+            <div class="app-main">
+                <header class="topbar">
+                    <button type="button" id="SidebarToggle" class="sidebar-toggle" aria-controls="AdminSidebar" aria-expanded="false" aria-label="Open navigation menu">
+                        <span></span><span></span><span></span>
+                    </button>
+                    <a class="brand" href="<%= ResolveUrl("~/Pages/Home.aspx") %>">Solapur Municipal Corporation <span>Tender Management System</span></a>
+                    <nav id="PublicNavigation" runat="server" class="primary-nav" aria-label="Primary navigation">
+                        <a href="<%= ResolveUrl("~/Pages/Home.aspx") %>">Home</a>
+                        <a href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>">Tenders</a>
+                        <a href="<%= ResolveUrl("~/Pages/Home.aspx#announcements") %>">Notices</a>
+                        <asp:HyperLink ID="DashboardLink" runat="server" NavigateUrl="~/Pages/Default.aspx" Visible="false">Dashboard</asp:HyperLink>
+                        <asp:HyperLink ID="PublicApprovalsLink" runat="server" NavigateUrl="~/Pages/Approvals.aspx" Visible="false">Approvals</asp:HyperLink>
+                        <asp:HyperLink ID="PublicAdminLink" runat="server" NavigateUrl="~/Pages/Admin.aspx" Visible="false">Administration</asp:HyperLink>
+                        <asp:HyperLink ID="LoginLink" runat="server" NavigateUrl="~/Pages/Login.aspx">Login</asp:HyperLink>
+                        <asp:HyperLink ID="RegisterLink" runat="server" NavigateUrl="~/Pages/Register.aspx">Register</asp:HyperLink>
+                        <asp:Literal ID="PublicCurrentUser" runat="server" />
+                        <asp:LinkButton ID="PublicSignOutLink" runat="server" OnClick="SignOutLink_Click" Visible="false">Sign out</asp:LinkButton>
+                    </nav>
+                </header>
+                <main class="container">
+                    <asp:ContentPlaceHolder ID="MainContent" runat="server" />
+                </main>
+                <footer class="footer">Solapur Municipal Corporation · Official e-Tender Portal</footer>
+            </div>
+        </div>
+        <script>
+            (function () {
+                var toggle = document.getElementById("SidebarToggle");
+                var sidebar = document.getElementById("AdminSidebar");
+                var scrim = document.getElementById("SidebarScrim");
+                if (!sidebar || !toggle || sidebar.style.display === "none") return;
+
+                function setSidebarOpen(isOpen) {
+                    document.body.classList.toggle("sidebar-open", isOpen);
+                    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+                    toggle.setAttribute("aria-label", isOpen ? "Close navigation menu" : "Open navigation menu");
+                }
+
+                toggle.addEventListener("click", function () {
+                    setSidebarOpen(!document.body.classList.contains("sidebar-open"));
+                });
+                scrim.addEventListener("click", function () { setSidebarOpen(false); });
+                sidebar.addEventListener("click", function (event) {
+                    if (event.target.closest("a")) setSidebarOpen(false);
+                });
+                document.addEventListener("keydown", function (event) {
+                    if (event.key === "Escape") setSidebarOpen(false);
+                });
+            }());
+        </script>
     </form>
 </body>
 </html>

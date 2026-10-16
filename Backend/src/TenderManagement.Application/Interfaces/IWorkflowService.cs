@@ -8,7 +8,7 @@ namespace TenderManagement.Application.Interfaces
         Task<ApprovalHistoryDto> ApproveAsync(int tenderId, ApproveRejectDto dto, int currentUserId, string roleName);
         Task<ApprovalHistoryDto> RejectAsync(int tenderId, ApproveRejectDto dto, int currentUserId, string roleName);
         Task<List<ApprovalHistoryDto>> GetHistoryAsync(int tenderId);
-        Task<List<PendingApprovalDto>> GetPendingApprovalsForRoleAsync(int roleId);
+        Task<List<PendingApprovalDto>> GetPendingApprovalsForRoleAsync(int roleId, int userId);
         Task<DashboardStatsDto> GetDashboardStatsAsync(int userId, int roleId);
     }
 }
