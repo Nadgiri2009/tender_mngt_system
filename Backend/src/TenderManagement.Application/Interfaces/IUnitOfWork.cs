@@ -13,6 +13,7 @@ namespace TenderManagement.Application.Interfaces
         IGenericRepository<Domain.Entities.BOQItem> BOQItems { get; }
         IGenericRepository<Domain.Entities.Contractor> Contractors { get; }
         IGenericRepository<Domain.Entities.TechnicalBid> TechnicalBids { get; }
+        IGenericRepository<Domain.Entities.TechnicalBidDocument> TechnicalBidDocuments { get; }
         IGenericRepository<Domain.Entities.FinancialBid> FinancialBids { get; }
         IGenericRepository<Domain.Entities.Agreement> Agreements { get; }
         IGenericRepository<Domain.Entities.WorkOrder> WorkOrders { get; }

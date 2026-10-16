@@ -51,6 +51,10 @@ pending-approvals/dashboard endpoints to avoid an extra DB round-trip per reques
 | GET | `/api/tenders/{id}/history` | full audit trail |
 | GET | `/api/approvals/pending` | tenders awaiting the caller's role |
 | GET | `/api/dashboard/stats` | |
+| GET | `/api/dashboard/public-stats` | anonymous public summary |
+| GET | `/api/dashboard/public-tenders` | anonymous; published notices only |
+| GET | `/api/dashboard/public-departments` | anonymous; active department names only |
+| GET | `/api/dashboard/admin-stats` | Admin only; status/category summaries and deadlines |
 | POST | `/api/documents/upload` | multipart |
 | GET | `/api/documents/{tenderId}` | |
 | POST | `/api/boq` | |
@@ -71,7 +75,7 @@ pending-approvals/dashboard endpoints to avoid an extra DB round-trip per reques
 | GET | `/api/departments`, `/api/roles`, `/api/contractors` | dropdown data |
 | GET | `/api/users`, `PUT /api/users/{id}/toggle-active` | Admin only |
 
-Full request/response shapes are visible in Swagger (`/swagger`) once running, generated directly
+DepartmentOfficer tender lists, dashboard summaries, and unpublished detail access are restricted to tenders created by the signed-in officer. Published tender notices remain publicly viewable. Full request/response shapes are visible in Swagger (`/swagger`) once running, generated directly
 from the DTOs in `TenderManagement.Application/DTOs`.
 
 ## Configuration

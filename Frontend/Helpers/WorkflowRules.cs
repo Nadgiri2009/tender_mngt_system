@@ -89,4 +89,62 @@ namespace DepartmentModule.Helpers
             }
         }
     }
+
+    public static class TenderStatusBuckets
+    {
+        public const string Approved =
+                "(t.CurrentStatus LIKE N'%Approved%' OR t.CurrentStatus IN " +
+                "(N'Tender Published',N'Final Approval',N'Agreement Completed',N'Work Order Generated'," +
+                "N'Work Started',N'Measurement Book Updated',N'Payment Completed'))";
+            public const string Pending =
+                "(t.CurrentStatus LIKE N'%Pending%' OR t.CurrentStatus IN " +
+                "(N'Requirement Submitted',N'Estimate Prepared',N'Tender Draft Created',N'Bill Submitted'))";
+            public const string Rejected = "t.CurrentStatus=N'Rejected'";
+            public const string UnderReview =
+                "t.CurrentStatus IN (N'Tender Committee Approval',N'Technical Bid Opening',N'Technical Evaluation'," +
+                "N'Financial Bid Opening',N'Financial Evaluation',N'CAFO Rate Opinion',N'MCA Opinion'," +
+                "N'Tender Committee Recommendation')";
+            public const string DraftOrSubmitted =
+                "t.CurrentStatus IN (N'Draft',N'Requirement Submitted',N'Estimate Prepared',N'Tender Draft Created')";
+
+        public static string Predicate(string bucket)
+        {
+            switch (bucket)
+            {
+                case "Approved": return Approved;
+                case "Pending": return Pending;
+                case "Rejected": return Rejected;
+                case "Under Review": return UnderReview;
+                case "Draft / Submitted": return DraftOrSubmitted;
+                default: return null;
+            }
+        }
+
+        public static string CssClass(string status)
+        {
+            if (String.Equals(status, "Rejected", StringComparison.OrdinalIgnoreCase)) return "badge status-rejected";
+            if ((status != null && status.IndexOf("Pending", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                String.Equals(status, "Requirement Submitted", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Estimate Prepared", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Tender Draft Created", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Bill Submitted", StringComparison.OrdinalIgnoreCase))
+                return "badge status-pending";
+            if ((status != null && status.IndexOf("Approved", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                String.Equals(status, "Tender Published", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Final Approval", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Agreement Completed", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Work Order Generated", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Work Started", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Measurement Book Updated", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Payment Completed", StringComparison.OrdinalIgnoreCase))
+                return "badge status-approved";
+            if (status != null &&
+                (status.IndexOf("Evaluation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 status.IndexOf("Opening", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 status.IndexOf("Opinion", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 status.IndexOf("Committee", StringComparison.OrdinalIgnoreCase) >= 0))
+                return "badge status-review";
+            return "badge";
+        }
+    }
 }

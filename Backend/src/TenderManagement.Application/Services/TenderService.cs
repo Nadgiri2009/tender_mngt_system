@@ -20,21 +20,11 @@ namespace TenderManagement.Application.Services
             _auditService = auditService;
         }
 
-        public async Task<PagedResult<TenderListItemDto>> GetTendersAsync(PaginationQuery query)
+        public async Task<PagedResult<TenderListItemDto>> GetTendersAsync(PaginationQuery query, int? createdByUserId = null)
         {
-            var (items, total) = await _unitOfWork.Tenders.GetPagedAsync(query);
+            var (items, total) = await _unitOfWork.Tenders.GetPagedAsync(query, createdByUserId);
 
-            var dtos = items.Select(t => new TenderListItemDto
-            {
-                TenderId = t.TenderId,
-                TenderNumber = t.TenderNumber,
-                TrackingId = t.TrackingId,
-                Title = t.Title,
-                DepartmentName = t.Department?.DepartmentName ?? string.Empty,
-                EstimatedAmount = t.EstimatedAmount,
-                CurrentStatus = t.CurrentStatus,
-                CreatedDate = t.CreatedDate
-            });
+            var dtos = items.Select(MapToListItemDto);
 
             return new PagedResult<TenderListItemDto>
             {
@@ -45,10 +35,20 @@ namespace TenderManagement.Application.Services
             };
         }
 
-        public async Task<TenderDetailDto> GetTenderByIdAsync(int id)
+        public async Task<TenderDetailDto> GetTenderByIdAsync(
+            int id,
+            int? createdByUserId = null,
+            bool allowPublishedForOtherOwners = false)
         {
             var tender = await _unitOfWork.Tenders.GetWithDetailsAsync(id)
                 ?? throw new NotFoundException(nameof(Tender), id);
+
+            if (createdByUserId.HasValue &&
+                tender.CreatedBy != createdByUserId.Value &&
+                !(allowPublishedForOtherOwners && tender.CurrentStatus == TenderStatus.TenderPublished))
+            {
+                throw new NotFoundException(nameof(Tender), id);
+            }
 
             return MapToDetailDto(tender);
         }
@@ -58,6 +58,26 @@ namespace TenderManagement.Application.Services
             if (dto.DepartmentId is null)
             {
                 throw new BusinessRuleException("A valid Department must be selected.");
+            }
+
+            if (dto.SubmissionStartDate.HasValue && !dto.SubmissionDeadline.HasValue)
+            {
+                throw new BusinessRuleException("A submission deadline is required when an application start date is set.");
+            }
+
+            if (dto.SubmissionStartDate.HasValue && dto.SubmissionDeadline.HasValue &&
+                dto.SubmissionDeadline.Value <= dto.SubmissionStartDate.Value)
+            {
+                throw new BusinessRuleException("Submission deadline must be after the application start date.");
+            }
+
+            var user = await _unitOfWork.Users.GetByIdAsync(currentUserId)
+                ?? throw new NotFoundException(nameof(User), currentUserId);
+            var role = await _unitOfWork.Roles.GetByIdAsync(user.RoleId);
+            if (string.Equals(role?.RoleName, RoleNames.DepartmentOfficer, StringComparison.OrdinalIgnoreCase) &&
+                (!user.DepartmentId.HasValue || dto.DepartmentId.Value != user.DepartmentId.Value))
+            {
+                throw new BusinessRuleException("Department officers may create tenders only for their assigned department.");
             }
 
             var department = await _unitOfWork.Departments.GetByIdAsync(dto.DepartmentId.Value)
@@ -72,6 +92,7 @@ namespace TenderManagement.Application.Services
                 DepartmentId = dto.DepartmentId.Value,
                 EstimatedAmount = dto.EstimatedAmount,
                 TenderType = dto.TenderType,
+                SubmissionStartDate = dto.SubmissionStartDate,
                 SubmissionDeadline = dto.SubmissionDeadline,
                 CurrentStatus = TenderStatus.Draft,
                 CreatedBy = currentUserId,
@@ -278,6 +299,29 @@ namespace TenderManagement.Application.Services
             }).ToList();
         }
 
+        private static TenderListItemDto MapToListItemDto(Tender t) => new()
+        {
+            TenderId = t.TenderId,
+            TenderNumber = t.TenderNumber,
+            TrackingId = t.TrackingId,
+            Title = t.Title,
+            DepartmentName = t.Department?.DepartmentName ?? string.Empty,
+            TenderType = t.TenderType,
+            EstimatedAmount = t.EstimatedAmount,
+            CurrentStatus = t.CurrentStatus,
+            PublicationDate = t.ApprovalHistories
+                .Where(h => h.NewStatus == TenderStatus.TenderPublished)
+                .Select(h => (DateTime?)h.ApprovalDate)
+                .Min(),
+            SubmissionStartDate = t.SubmissionStartDate,
+            SubmissionDeadline = t.SubmissionDeadline,
+            AssignedRespOfficer = TenderAssignmentMapper.GetAssignedRespOfficer(t),
+            AssignedRole = TenderAssignmentMapper.GetAssignedRole(t.CurrentStatus),
+            CreatedDate = t.CreatedDate,
+            CanApply = TenderApplicationRules.CanApply(t, DateTime.UtcNow),
+            ApplicationStatus = TenderApplicationRules.GetApplicationStatus(t, DateTime.UtcNow)
+        };
+
         private static TenderDetailDto MapToDetailDto(Tender t) => new()
         {
             TenderId = t.TenderId,
@@ -289,8 +333,17 @@ namespace TenderManagement.Application.Services
             EstimatedAmount = t.EstimatedAmount,
             CurrentStatus = t.CurrentStatus,
             TenderType = t.TenderType,
+            PublicationDate = t.ApprovalHistories
+                .Where(h => h.NewStatus == TenderStatus.TenderPublished)
+                .Select(h => (DateTime?)h.ApprovalDate)
+                .Min(),
+            SubmissionStartDate = t.SubmissionStartDate,
             SubmissionDeadline = t.SubmissionDeadline,
+            AssignedRespOfficer = TenderAssignmentMapper.GetAssignedRespOfficer(t),
+            AssignedRole = TenderAssignmentMapper.GetAssignedRole(t.CurrentStatus),
             CreatedDate = t.CreatedDate,
+            CanApply = TenderApplicationRules.CanApply(t, DateTime.UtcNow),
+            ApplicationStatus = TenderApplicationRules.GetApplicationStatus(t, DateTime.UtcNow),
             CreatedByName = t.CreatedByUser?.FullName ?? string.Empty,
             BOQItems = t.BOQItems.Select(b => new BOQItemDto
             {

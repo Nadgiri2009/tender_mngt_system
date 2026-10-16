@@ -12,6 +12,7 @@ namespace TenderManagement.Domain.Entities
         public decimal EstimatedAmount { get; set; }
         public string TenderType { get; set; } = string.Empty;
         public string CurrentStatus { get; set; } = Enums.TenderStatus.Draft;
+        public DateTime? SubmissionStartDate { get; set; }
         public DateTime? SubmissionDeadline { get; set; }
         public int CreatedBy { get; set; }
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;

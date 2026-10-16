@@ -17,6 +17,7 @@ namespace TenderManagement.Infrastructure.Data
         public DbSet<TenderDocument> TenderDocuments => Set<TenderDocument>();
         public DbSet<BOQItem> BOQItems => Set<BOQItem>();
         public DbSet<TechnicalBid> TechnicalBids => Set<TechnicalBid>();
+        public DbSet<TechnicalBidDocument> TechnicalBidDocuments => Set<TechnicalBidDocument>();
         public DbSet<FinancialBid> FinancialBids => Set<FinancialBid>();
         public DbSet<Agreement> Agreements => Set<Agreement>();
         public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
@@ -130,6 +131,16 @@ namespace TenderManagement.Infrastructure.Data
                 e.HasIndex(x => new { x.TenderId, x.ContractorId }).IsUnique();
                 e.HasOne(x => x.Tender).WithMany(t => t.TechnicalBids).HasForeignKey(x => x.TenderId);
                 e.HasOne(x => x.Contractor).WithMany(c => c.TechnicalBids).HasForeignKey(x => x.ContractorId);
+                e.HasMany(x => x.Documents).WithOne(x => x.TechnicalBid).HasForeignKey(x => x.TechnicalBidId);
+            });
+
+            modelBuilder.Entity<TechnicalBidDocument>(e =>
+            {
+                e.ToTable("TechnicalBidDocuments");
+                e.HasKey(x => x.TechnicalBidDocumentId);
+                e.Property(x => x.FileName).IsRequired().HasMaxLength(260);
+                e.Property(x => x.FilePath).IsRequired().HasMaxLength(400);
+                e.HasOne(x => x.TechnicalBid).WithMany(x => x.Documents).HasForeignKey(x => x.TechnicalBidId);
             });
 
             modelBuilder.Entity<FinancialBid>(e =>

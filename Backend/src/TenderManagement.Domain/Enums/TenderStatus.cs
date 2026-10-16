@@ -49,6 +49,28 @@ namespace TenderManagement.Domain.Enums
         public const string EOI = "EOI";
     }
 
+    public static class TenderStatusBuckets
+    {
+        public static bool IsApproved(string status) =>
+            status.Contains("Approved", StringComparison.OrdinalIgnoreCase) ||
+            status is TenderStatus.TenderPublished or TenderStatus.FinalApproval or TenderStatus.AgreementCompleted
+                or TenderStatus.WorkOrderGenerated or TenderStatus.WorkStarted or TenderStatus.MeasurementBookUpdated
+                or TenderStatus.PaymentCompleted;
+
+        public static bool IsPending(string status) =>
+            status.Contains("Pending", StringComparison.OrdinalIgnoreCase) ||
+            status is TenderStatus.RequirementSubmitted or TenderStatus.EstimatePrepared or TenderStatus.TenderDraftCreated
+                or TenderStatus.BillSubmitted;
+
+        public static bool IsRejected(string status) =>
+            status.Equals(TenderStatus.Rejected, StringComparison.OrdinalIgnoreCase);
+
+        public static bool IsUnderReview(string status) =>
+            status is TenderStatus.TenderCommitteeApproval or TenderStatus.TechnicalBidOpening
+                or TenderStatus.TechnicalEvaluation or TenderStatus.FinancialBidOpening or TenderStatus.FinancialEvaluation
+                or TenderStatus.CAFORateOpinion or TenderStatus.MCAOpinion or TenderStatus.TenderCommitteeRecommendation;
+    }
+
     public static class RoleNames
     {
         public const string Admin = "Admin";

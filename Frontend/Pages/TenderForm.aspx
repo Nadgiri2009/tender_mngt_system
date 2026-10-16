@@ -18,7 +18,10 @@
                 <asp:RequiredFieldValidator ID="AmountRequired" runat="server" ControlToValidate="AmountText" ErrorMessage="Estimated amount is required." CssClass="validation" />
                 <asp:RangeValidator ID="AmountRange" runat="server" ControlToValidate="AmountText" Type="Double" MinimumValue="0.01" MaximumValue="999999999999999" ErrorMessage="Estimated amount must be greater than zero." CssClass="validation" /></div>
         </div>
-        <div class="field"><label for="DeadlineText">Submission Deadline</label><asp:TextBox ID="DeadlineText" runat="server" TextMode="DateTimeLocal" /></div>
+        <div class="row">
+            <div class="field"><label for="StartText">Submission Start Date</label><asp:TextBox ID="StartText" runat="server" TextMode="DateTimeLocal" /></div>
+            <div class="field"><label for="DeadlineText">Submission Deadline</label><asp:TextBox ID="DeadlineText" runat="server" TextMode="DateTimeLocal" /></div>
+        </div>
         <asp:Panel ID="AttachmentPanel" runat="server" CssClass="field"><label for="Attachments">Attachments</label><asp:FileUpload ID="Attachments" runat="server" AllowMultiple="true" />
             <span class="help">Optional supporting documents. PDF, Office documents, JPEG, or PNG; maximum 20 MB each.</span></asp:Panel>
         <asp:Button ID="CreateButton" runat="server" Text="Create Tender" CssClass="button" OnClick="CreateButton_Click" />

@@ -36,6 +36,16 @@ namespace TenderManagement.Application.DTOs.Bid
         public DateTime SubmittedDate { get; set; }
     }
 
+    public class TenderApplicationDto
+    {
+        public int TechnicalBidId { get; set; }
+        public int TenderId { get; set; }
+        public string ApplicationReference { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime SubmittedDate { get; set; }
+        public List<string> Documents { get; set; } = new();
+    }
+
     public class SubmitFinancialBidDto
     {
         [Required, Range(1, int.MaxValue)]

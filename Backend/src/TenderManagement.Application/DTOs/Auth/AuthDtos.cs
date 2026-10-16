@@ -16,6 +16,12 @@ namespace TenderManagement.Application.DTOs.Auth
         [Required, StringLength(150)]
         public string FullName { get; set; } = string.Empty;
 
+        [Required, StringLength(150)]
+        public string CompanyName { get; set; } = string.Empty;
+
+        [StringLength(300)]
+        public string? Address { get; set; }
+
         [Required, EmailAddress]
         public string Email { get; set; } = string.Empty;
 
@@ -24,6 +30,9 @@ namespace TenderManagement.Application.DTOs.Auth
 
         [Required, MinLength(6)]
         public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public bool TermsAccepted { get; set; }
 
         [Required]
         public int RoleId { get; set; }

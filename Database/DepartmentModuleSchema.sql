@@ -33,7 +33,8 @@ DECLARE @RequiredColumns TABLE (TableName sysname NOT NULL, ColumnName sysname N
 INSERT INTO @RequiredColumns (TableName, ColumnName) VALUES
     (N'Tender',N'TenderNumber'), (N'Tender',N'TrackingId'), (N'Tender',N'DepartmentId'),
     (N'Tender',N'EstimatedAmount'), (N'Tender',N'CurrentStatus'), (N'Tender',N'CreatedBy'),
-    (N'Tender',N'IsDeleted'), (N'ApprovalHistory',N'ApprovalStage'), (N'ApprovalHistory',N'ApprovedBy'),
+    (N'Tender',N'IsDeleted'), (N'Tender',N'SubmissionStartDate'),
+    (N'ApprovalHistory',N'ApprovalStage'), (N'ApprovalHistory',N'ApprovedBy'),
     (N'TenderDocuments',N'FilePath'), (N'BOQ',N'Amount'), (N'Contractors',N'Name'),
     (N'Agreement',N'AgreementNo'), (N'WorkOrder',N'OrderNo'), (N'WorkExecution',N'ProgressPercentage'),
     (N'MeasurementBook',N'ApprovalStatus'), (N'Bills',N'Status'), (N'Payments',N'TransactionNo'),

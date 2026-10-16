@@ -49,6 +49,11 @@ namespace TenderManagement.Application.Services
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request)
         {
+            if (!request.TermsAccepted)
+            {
+                throw new BusinessRuleException("You must accept the portal terms to register.");
+            }
+
             var existing = await _unitOfWork.Users.FindAsync(u => u.Email == request.Email);
             if (existing.Any())
             {
@@ -88,7 +93,20 @@ namespace TenderManagement.Application.Services
             await _unitOfWork.Users.AddAsync(user);
             await _unitOfWork.CompleteAsync();
 
+            await _unitOfWork.Contractors.AddAsync(new Contractor
+            {
+                Name = request.CompanyName.Trim(),
+                RegistrationNo = $"PORTAL-{user.UserId:D8}",
+                Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
+                ContactNo = user.Mobile,
+                Email = user.Email,
+                UserId = user.UserId,
+                IsActive = true
+            });
+            await _unitOfWork.CompleteAsync();
+
             await _auditService.LogAsync(user.UserId, "Register", nameof(User), user.UserId);
+            await _auditService.LogAsync(user.UserId, "AcceptRegistrationTerms", nameof(User), user.UserId, "Portal terms v1");
 
             var (token, expiresAt) = _jwtTokenService.GenerateToken(user, role.RoleName);
 

@@ -19,6 +19,8 @@ namespace TenderManagement.Application.DTOs.Tender
         [Required, StringLength(50)]
         public string TenderType { get; set; } = string.Empty;
 
+        public DateTime? SubmissionStartDate { get; set; }
+
         public DateTime? SubmissionDeadline { get; set; }
     }
 
@@ -46,16 +48,22 @@ namespace TenderManagement.Application.DTOs.Tender
         public string TrackingId { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public string DepartmentName { get; set; } = string.Empty;
+        public string TenderType { get; set; } = string.Empty;
         public decimal EstimatedAmount { get; set; }
         public string CurrentStatus { get; set; } = string.Empty;
+        public DateTime? PublicationDate { get; set; }
+        public DateTime? SubmissionStartDate { get; set; }
+        public DateTime? SubmissionDeadline { get; set; }
+        public string AssignedRespOfficer { get; set; } = string.Empty;
+        public string? AssignedRole { get; set; }
         public DateTime CreatedDate { get; set; }
+        public bool CanApply { get; set; }
+        public string ApplicationStatus { get; set; } = string.Empty;
     }
 
     public class TenderDetailDto : TenderListItemDto
     {
         public string? Description { get; set; }
-        public string TenderType { get; set; } = string.Empty;
-        public DateTime? SubmissionDeadline { get; set; }
         public string CreatedByName { get; set; } = string.Empty;
         public List<BOQItemDto> BOQItems { get; set; } = new();
         public List<TenderDocumentDto> Documents { get; set; } = new();

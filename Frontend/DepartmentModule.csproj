@@ -24,14 +24,35 @@
     <Reference Include="BCrypt.Net-Next">
       <HintPath>$(NuGetPackageRoot)bcrypt.net-next\4.0.3\lib\net48\BCrypt.Net-Next.dll</HintPath>
     </Reference>
+    <Reference Include="System.Memory">
+      <HintPath>$(NuGetPackageRoot)system.memory\4.5.5\lib\net461\System.Memory.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Buffers">
+      <HintPath>$(NuGetPackageRoot)system.buffers\4.5.1\lib\net461\System.Buffers.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>$(NuGetPackageRoot)system.runtime.compilerservices.unsafe\4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Numerics.Vectors">
+      <HintPath>$(NuGetPackageRoot)system.numerics.vectors\4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.5.3" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Global.asax.cs"><DependentUpon>Global.asax</DependentUpon></Compile>
     <Compile Include="Helpers\ModuleDb.cs" />
     <Compile Include="Helpers\ModulePage.cs" />
+    <Compile Include="Helpers\OtpChallenge.cs" />
     <Compile Include="Helpers\WorkflowRules.cs" />
     <Compile Include="Pages\Site.Master.cs"><DependentUpon>Site.Master</DependentUpon></Compile>
     <Compile Include="Pages\Home.aspx.cs"><DependentUpon>Home.aspx</DependentUpon></Compile>
@@ -39,6 +60,8 @@
     <Compile Include="Pages\Register.aspx.cs"><DependentUpon>Register.aspx</DependentUpon></Compile>
     <Compile Include="Pages\Admin.aspx.cs"><DependentUpon>Admin.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminUsers.aspx.cs"><DependentUpon>AdminUsers.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\AdminAudit.aspx.cs"><DependentUpon>AdminAudit.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\AdminReports.aspx.cs"><DependentUpon>AdminReports.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminDepartments.aspx.cs"><DependentUpon>AdminDepartments.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminAnnouncements.aspx.cs"><DependentUpon>AdminAnnouncements.aspx</DependentUpon></Compile>
     <Compile Include="Pages\Default.aspx.cs"><DependentUpon>Default.aspx</DependentUpon></Compile>
@@ -60,6 +83,8 @@
     <Content Include="Pages\Register.aspx" />
     <Content Include="Pages\Admin.aspx" />
     <Content Include="Pages\AdminUsers.aspx" />
+    <Content Include="Pages\AdminAudit.aspx" />
+    <Content Include="Pages\AdminReports.aspx" />
     <Content Include="Pages\AdminDepartments.aspx" />
     <Content Include="Pages\AdminAnnouncements.aspx" />
     <Content Include="Pages\Default.aspx" />
