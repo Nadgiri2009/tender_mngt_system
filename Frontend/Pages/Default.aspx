@@ -13,6 +13,17 @@
         <a class="stat" href="<%= ResolveUrl("~/Pages/Tenders.aspx?bucket=Rejected") %>"><span class="muted">Rejected</span><strong><asp:Literal ID="RejectedTenders" runat="server" /></strong></a>
         <a class="stat" href="<%= ResolveUrl("~/Pages/Tenders.aspx?bucket=Under%20Review") %>"><span class="muted">Under review</span><strong><asp:Literal ID="UnderReviewTenders" runat="server" /></strong></a>
     </section>
+    <asp:Panel ID="LifecycleSummaryPanel" runat="server" CssClass="cards dashboard-statistics">
+        <a class="stat" href="<%= ResolveUrl("~/Pages/Approvals.aspx") %>"><span class="muted">Pending approvals</span><strong><asp:Literal ID="LifecyclePendingApprovals" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderLifecycle.aspx") %>"><span class="muted">Tenders awaiting publication</span><strong><asp:Literal ID="LifecycleAwaitingPublication" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>"><span class="muted">Currently published</span><strong><asp:Literal ID="LifecyclePublished" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderLifecycle.aspx") %>"><span class="muted">Extension requests</span><strong><asp:Literal ID="LifecycleExtensions" runat="server" /></strong></a>
+        <asp:PlaceHolder ID="LifecycleReviewSummaryPanel" runat="server">
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderEvaluation.aspx") %>"><span class="muted">Pending bid openings</span><strong><asp:Literal ID="LifecycleBidOpenings" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderEvaluation.aspx") %>"><span class="muted">Awaiting evaluation</span><strong><asp:Literal ID="LifecycleAwaitingEvaluation" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderEvaluation.aspx") %>"><span class="muted">Under evaluation</span><strong><asp:Literal ID="LifecycleUnderEvaluation" runat="server" /></strong></a>
+        </asp:PlaceHolder>
+    </asp:Panel>
     <asp:Panel ID="PendingApprovalsPanel" runat="server">
     <section class="card">
         <div class="page-heading"><div><h2>Pending my approval</h2><div class="muted">Tenders waiting for your role.</div></div><a href="Approvals.aspx">View queue</a></div>

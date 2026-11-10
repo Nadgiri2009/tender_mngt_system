@@ -53,6 +53,7 @@
     <Compile Include="Helpers\ModuleDb.cs" />
     <Compile Include="Helpers\ModulePage.cs" />
     <Compile Include="Helpers\OtpChallenge.cs" />
+    <Compile Include="Helpers\TenderLifecycleFiles.cs" />
     <Compile Include="Helpers\WorkflowRules.cs" />
     <Compile Include="Pages\Site.Master.cs"><DependentUpon>Site.Master</DependentUpon></Compile>
     <Compile Include="Pages\Home.aspx.cs"><DependentUpon>Home.aspx</DependentUpon></Compile>
@@ -70,6 +71,8 @@
     <Compile Include="Pages\TenderDetails.aspx.cs"><DependentUpon>TenderDetails.aspx</DependentUpon></Compile>
     <Compile Include="Pages\Approvals.aspx.cs"><DependentUpon>Approvals.aspx</DependentUpon></Compile>
     <Compile Include="Pages\Bids.aspx.cs"><DependentUpon>Bids.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\TenderLifecycle.aspx.cs"><DependentUpon>TenderLifecycle.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\TenderEvaluation.aspx.cs"><DependentUpon>TenderEvaluation.aspx</DependentUpon></Compile>
     <Compile Include="Pages\WorkManagement.aspx.cs"><DependentUpon>WorkManagement.aspx</DependentUpon></Compile>
     <Compile Include="Pages\DocumentDownload.aspx.cs"><DependentUpon>DocumentDownload.aspx</DependentUpon></Compile>
     <Compile Include="Pages\Error.aspx.cs"><DependentUpon>Error.aspx</DependentUpon></Compile>
@@ -93,12 +96,17 @@
     <Content Include="Pages\TenderDetails.aspx" />
     <Content Include="Pages\Approvals.aspx" />
     <Content Include="Pages\Bids.aspx" />
+    <Content Include="Pages\TenderLifecycle.aspx" />
+    <Content Include="Pages\TenderEvaluation.aspx" />
     <Content Include="Pages\WorkManagement.aspx" />
     <Content Include="Pages\DocumentDownload.aspx" />
     <Content Include="Pages\Error.aspx" />
     <Content Include="Content\Styles.css" />
     <Content Include="..\Database\DepartmentModuleSchema.sql">
       <Link>Database\DepartmentModuleSchema.sql</Link>
+    </Content>
+    <Content Include="..\Database\09_AddTenderLifecycle.sql">
+      <Link>Database\09_AddTenderLifecycle.sql</Link>
     </Content>
     <Content Include="README.md" />
     <Content Include="INTEGRATION_GUIDE.md" />

@@ -14,7 +14,10 @@ INSERT INTO @RequiredTables (TableName) VALUES
     (N'Roles'), (N'Departments'), (N'Users'), (N'Contractors'), (N'Tender'),
     (N'ApprovalHistory'), (N'TenderDocuments'), (N'BOQ'), (N'TechnicalBid'),
     (N'FinancialBid'), (N'Agreement'), (N'WorkOrder'), (N'WorkExecution'),
-    (N'MeasurementBook'), (N'Bills'), (N'Payments'), (N'AuditLog'), (N'WorkflowStages');
+    (N'MeasurementBook'), (N'Bills'), (N'Payments'), (N'AuditLog'), (N'WorkflowStages'),
+    (N'TenderPublicationSchedule'), (N'TenderExtensionRequests'), (N'TenderBidOpening'),
+    (N'TenderEvaluationSettings'), (N'TenderEvaluation'), (N'TenderEvaluationDocuments'),
+    (N'TenderLifecycleHistory'), (N'TenderBudgetOpinions');
 
 IF EXISTS
 (
@@ -38,7 +41,13 @@ INSERT INTO @RequiredColumns (TableName, ColumnName) VALUES
     (N'TenderDocuments',N'FilePath'), (N'BOQ',N'Amount'), (N'Contractors',N'Name'),
     (N'Agreement',N'AgreementNo'), (N'WorkOrder',N'OrderNo'), (N'WorkExecution',N'ProgressPercentage'),
     (N'MeasurementBook',N'ApprovalStatus'), (N'Bills',N'Status'), (N'Payments',N'TransactionNo'),
-    (N'WorkflowStages',N'ApproverRoleId'), (N'Users',N'RoleId');
+    (N'WorkflowStages',N'ApproverRoleId'), (N'Users',N'RoleId'),
+    (N'TenderPublicationSchedule',N'PublicationStartUtc'), (N'TenderPublicationSchedule',N'CurrentClosingUtc'),
+    (N'TenderExtensionRequests',N'ReviewStatus'), (N'TenderExtensionRequests',N'ExtensionNumber'),
+    (N'TenderBidOpening',N'ActualOpeningUtc'), (N'TenderEvaluationSettings',N'StartDelayDays'),
+    (N'TenderEvaluation',N'EvaluationEligibleAtUtc'), (N'TenderEvaluation',N'EvaluationStatus'),
+    (N'TenderEvaluationDocuments',N'FilePath'), (N'TenderLifecycleHistory',N'ActionAtUtc'),
+    (N'TenderBudgetOpinions',N'Opinion'), (N'TenderBudgetOpinions',N'ApprovedAmount');
 
 IF EXISTS
 (

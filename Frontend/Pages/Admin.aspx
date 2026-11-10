@@ -17,6 +17,15 @@
         <a class="stat" href="<%= ResolveUrl("~/Pages/AdminUsers.aspx") %>"><span class="muted">Inactive contractors</span><strong><asp:Literal ID="InactiveContractors" runat="server" /></strong></a>
         <a class="stat" href="<%= ResolveUrl("~/Pages/AdminUsers.aspx") %>"><span class="muted">Inactive users</span><strong><asp:Literal ID="InactiveUsers" runat="server" /></strong></a>
     </section>
+    <section class="cards dashboard-statistics" aria-label="Tender lifecycle summary">
+        <a class="stat" href="<%= ResolveUrl("~/Pages/Approvals.aspx") %>"><span class="muted">Pending approvals</span><strong><asp:Literal ID="LifecyclePendingApprovals" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderLifecycle.aspx") %>"><span class="muted">Tenders awaiting publication</span><strong><asp:Literal ID="LifecycleAwaitingPublication" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>"><span class="muted">Currently published</span><strong><asp:Literal ID="LifecyclePublished" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderLifecycle.aspx") %>"><span class="muted">Extension requests</span><strong><asp:Literal ID="LifecycleExtensions" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderEvaluation.aspx") %>"><span class="muted">Pending bid openings</span><strong><asp:Literal ID="LifecycleBidOpenings" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderEvaluation.aspx") %>"><span class="muted">Awaiting evaluation</span><strong><asp:Literal ID="LifecycleAwaitingEvaluation" runat="server" /></strong></a>
+        <a class="stat" href="<%= ResolveUrl("~/Pages/TenderEvaluation.aspx") %>"><span class="muted">Under evaluation</span><strong><asp:Literal ID="LifecycleUnderEvaluation" runat="server" /></strong></a>
+    </section>
     <section class="card">
         <div class="page-heading"><div><h2>Tenders by category</h2><div class="muted">Counts use the existing tender type values.</div></div></div>
         <asp:GridView ID="CategoryStatsGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No category statistics are available.">

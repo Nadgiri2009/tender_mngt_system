@@ -3,6 +3,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.Web;
+using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
 using DepartmentModule.Helpers;
 
@@ -11,6 +12,7 @@ namespace DepartmentModule.Pages
     public partial class Bids : ModulePage
     {
         protected Literal TenderNumber, TenderTitle, Message;
+        protected HtmlGenericControl TechnicalBidsSection, FinancialBidsSection;
         protected HyperLink BackLink;
         protected GridView TechnicalGrid, FinancialGrid;
         protected Panel EvaluatePanel, SelectPanel, TechnicalSubmissionPanel, FinancialSubmissionPanel;
@@ -20,11 +22,20 @@ namespace DepartmentModule.Pages
         protected Literal ContractorProfileMessage;
         protected System.Web.UI.HtmlControls.HtmlGenericControl TechnicalContractorField, FinancialContractorField;
         private int TenderId { get { return QueryId("tenderId"); } }
+        private bool IsReviewer { get { return HasAnyRole("TenderSection", "TenderCommittee", "CAFOOfficer", "Admin"); } }
+        private bool IsContractor { get { return HasAnyRole("Contractor"); } }
 
         protected void Page_Load(object sender, EventArgs e)
         {
             if (TenderId <= 0) { Response.Redirect("~/Pages/Tenders.aspx", false); Context.ApplicationInstance.CompleteRequest(); return; }
-            if (!RequireOwnedTenderForDepartmentOfficer(TenderId)) return;
+            if (!IsReviewer && !IsContractor)
+            {
+                Response.StatusCode = 403;
+                Response.TrySkipIisCustomErrors = true;
+                Response.Redirect("~/Pages/Error.aspx?code=403", false);
+                Context.ApplicationInstance.CompleteRequest();
+                return;
+            }
             if (!IsPostBack) LoadPage();
         }
 
@@ -35,9 +46,20 @@ namespace DepartmentModule.Pages
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 {
                     string currentStatus;
-                    using (SqlCommand command = new SqlCommand("SELECT TenderNumber,Title,CurrentStatus FROM dbo.Tender WHERE TenderId=@TenderId AND IsDeleted=0;", connection))
+                    using (SqlCommand command = new SqlCommand(
+                        @"SELECT t.TenderNumber,t.Title,t.CurrentStatus
+                          FROM dbo.Tender t
+                          WHERE t.TenderId=@TenderId AND t.IsDeleted=0
+                            AND (@Role=N'Admin' OR
+                                 (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                             WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId IS NOT NULL)
+                                  OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                            WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId=t.DepartmentId)));",
+                        connection))
                     {
                         ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                        AddText(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                        ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
                             if (!reader.Read()) { Response.Redirect("~/Pages/Tenders.aspx", false); Context.ApplicationInstance.CompleteRequest(); return; }
@@ -52,11 +74,40 @@ namespace DepartmentModule.Pages
                         Context.ApplicationInstance.CompleteRequest();
                         return;
                     }
+                    bool openingComplete;
+                    using (SqlCommand command = new SqlCommand(
+                        "SELECT COUNT(1) FROM dbo.TenderBidOpening WHERE TenderId=@TenderId;", connection))
+                    {
+                        ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                        openingComplete = Convert.ToInt32(command.ExecuteScalar()) == 1;
+                    }
+                    bool financialOpening = IsFinancialOpeningOrLater(currentStatus);
+                    bool isAuthorizedReviewer = IsReviewer && openingComplete;
+                    bool canSubmit = IsContractor && IsBidWindowOpen(connection, null);
+                    TechnicalBidsSection.Visible = (IsContractor || isAuthorizedReviewer) &&
+                        (!IsReviewer || openingComplete);
+                    FinancialBidsSection.Visible = IsContractor && canSubmit ||
+                        (isAuthorizedReviewer && financialOpening);
+                    if (IsReviewer && !openingComplete)
+                    {
+                        Message.Text = "<div class=\"message\">Bid contents remain confidential until the authorized bid opening has been recorded.</div>";
+                    }
+                    else if (IsContractor && !canSubmit)
+                    {
+                        Message.Text = "<div class=\"message\">Bid submission is available only during the approved publication period.</div>";
+                    }
                     BindTechnical(connection);
-                    BindFinancial(connection);
-                    EvaluatePanel.Visible = HasAnyRole("TenderSection", "Admin");
-                    SelectPanel.Visible = HasAnyRole("TenderCommittee", "Admin");
-                    ConfigureSubmissionPanels(connection);
+                    if (financialOpening && isAuthorizedReviewer || IsContractor)
+                        BindFinancial(connection);
+                    else
+                    {
+                        FinancialGrid.DataSource = new DataTable();
+                        FinancialGrid.DataBind();
+                    }
+                    EvaluatePanel.Visible = HasAnyRole("TenderSection", "Admin") &&
+                        openingComplete && String.Equals(currentStatus, "Technical Evaluation", StringComparison.OrdinalIgnoreCase);
+                    SelectPanel.Visible = HasAnyRole("TenderCommittee", "Admin") && openingComplete && financialOpening;
+                    ConfigureSubmissionPanels(connection, canSubmit);
                 }
             }
             catch (SqlException ex)
@@ -68,12 +119,28 @@ namespace DepartmentModule.Pages
 
         private void BindTechnical(SqlConnection connection)
         {
+            string bidderScope = IsContractor ? " AND b.ContractorId=@ContractorId" : String.Empty;
+            bool mayReadAll = IsReviewer && IsBidOpeningRecorded(connection);
+            if (!mayReadAll && !IsContractor)
+            {
+                TechnicalGrid.DataSource = new DataTable();
+                TechnicalGrid.DataBind();
+                TechnicalBidSelect.Items.Clear();
+                TechnicalBidSelect.Items.Add(new ListItem("Select submitted bid", ""));
+                return;
+            }
             using (SqlCommand command = new SqlCommand(
                 @"SELECT b.TechnicalBidId,b.ContractorId,c.Name AS ContractorName,b.DocumentPath,b.Status,b.Remarks,b.SubmittedDate
                   FROM dbo.TechnicalBid b INNER JOIN dbo.Contractors c ON c.ContractorId=b.ContractorId
-                  WHERE b.TenderId=@TenderId ORDER BY b.SubmittedDate;", connection))
+                  WHERE b.TenderId=@TenderId" + bidderScope + " ORDER BY b.SubmittedDate;", connection))
             {
                 ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                if (IsContractor)
+                {
+                    int? contractorId = GetCurrentContractorId(connection);
+                    ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int,
+                        contractorId.HasValue ? (object)contractorId.Value : -1);
+                }
                 DataTable table = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(table);
                 TechnicalGrid.DataSource = table;
@@ -94,13 +161,20 @@ namespace DepartmentModule.Pages
 
         private void BindFinancial(SqlConnection connection)
         {
+            string bidderScope = IsContractor ? " AND fb.ContractorId=@ContractorId" : String.Empty;
             using (SqlCommand command = new SqlCommand(
                 @"SELECT fb.FinancialBidId,fb.ContractorId,c.Name AS ContractorName,fb.BidAmount,
                          RANK() OVER (ORDER BY fb.BidAmount ASC) AS Rank,fb.Status
                   FROM dbo.FinancialBid fb INNER JOIN dbo.Contractors c ON c.ContractorId=fb.ContractorId
-                  WHERE fb.TenderId=@TenderId ORDER BY fb.BidAmount ASC;", connection))
+                  WHERE fb.TenderId=@TenderId" + bidderScope + " ORDER BY fb.BidAmount ASC;", connection))
             {
                 ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                if (IsContractor)
+                {
+                    int? contractorId = GetCurrentContractorId(connection);
+                    ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int,
+                        contractorId.HasValue ? (object)contractorId.Value : -1);
+                }
                 DataTable table = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(table);
                 FinancialGrid.DataSource = table;
@@ -118,14 +192,13 @@ namespace DepartmentModule.Pages
             }
         }
 
-        private void ConfigureSubmissionPanels(SqlConnection connection)
+        private void ConfigureSubmissionPanels(SqlConnection connection, bool canSubmit)
         {
             FinancialBidAmountText.Attributes["step"] = "0.01";
             FinancialBidAmountText.Attributes["min"] = "0.01";
-            bool isContractor = HasAnyRole("Contractor");
             bool isAdmin = HasAnyRole("Admin");
-            TechnicalSubmissionPanel.Visible = isContractor || isAdmin;
-            FinancialSubmissionPanel.Visible = isContractor || isAdmin;
+            TechnicalSubmissionPanel.Visible = (IsContractor || isAdmin) && canSubmit;
+            FinancialSubmissionPanel.Visible = (IsContractor || isAdmin) && canSubmit;
             TechnicalContractorField.Visible = isAdmin;
             FinancialContractorField.Visible = isAdmin;
 
@@ -136,7 +209,7 @@ namespace DepartmentModule.Pages
                 return;
             }
 
-            if (!isContractor)
+            if (!IsContractor)
             {
                 return;
             }
@@ -163,12 +236,6 @@ namespace DepartmentModule.Pages
             {
                 SubmitTechnicalButton.Enabled = false;
                 ContractorProfileMessage.Text = "<div class=\"message\">Your technical bid status is " + HttpUtility.HtmlEncode(technicalStatus) + ".</div>";
-            }
-
-            if (!String.Equals(technicalStatus, "Qualified", StringComparison.OrdinalIgnoreCase))
-            {
-                FinancialSubmissionPanel.Visible = false;
-                return;
             }
 
             using (SqlCommand command = new SqlCommand(
@@ -254,6 +321,7 @@ namespace DepartmentModule.Pages
 
                     using (SqlTransaction transaction = connection.BeginTransaction())
                     {
+                        EnsureBidWindowOpen(connection, transaction);
                         using (SqlCommand command = new SqlCommand(
                             @"INSERT INTO dbo.TechnicalBid (TenderId,ContractorId,DocumentPath,Status,SubmittedDate)
                               VALUES (@TenderId,@ContractorId,@DocumentPath,N'Submitted',SYSUTCDATETIME());", connection, transaction))
@@ -278,6 +346,7 @@ namespace DepartmentModule.Pages
                     ? "A technical bid has already been submitted for this contractor and tender."
                     : "The technical bid could not be submitted.");
             }
+            catch (InvalidOperationException ex) { ShowError(ex.Message); }
         }
 
         protected void SubmitFinancialButton_Click(object sender, EventArgs e)
@@ -304,18 +373,7 @@ namespace DepartmentModule.Pages
 
                     using (SqlTransaction transaction = connection.BeginTransaction())
                     {
-                        using (SqlCommand qualifiedCommand = new SqlCommand(
-                            "SELECT COUNT(1) FROM dbo.TechnicalBid WHERE TenderId=@TenderId AND ContractorId=@ContractorId AND Status=N'Qualified';",
-                            connection, transaction))
-                        {
-                            ModuleDb.AddParameter(qualifiedCommand, "@TenderId", SqlDbType.Int, TenderId);
-                            ModuleDb.AddParameter(qualifiedCommand, "@ContractorId", SqlDbType.Int, contractorId.Value);
-                            if (Convert.ToInt32(qualifiedCommand.ExecuteScalar()) != 1)
-                            {
-                                ShowError("Only contractors with a Qualified technical bid may submit a financial bid.");
-                                return;
-                            }
-                        }
+                        EnsureBidWindowOpen(connection, transaction);
 
                         using (SqlCommand command = new SqlCommand(
                             @"INSERT INTO dbo.FinancialBid (TenderId,ContractorId,BidAmount,Status,SubmittedDate)
@@ -341,6 +399,7 @@ namespace DepartmentModule.Pages
                     ? "A financial bid has already been submitted for this contractor and tender."
                     : "The financial bid could not be submitted.");
             }
+            catch (InvalidOperationException ex) { ShowError(ex.Message); }
         }
 
         protected void EvaluateButton_Click(object sender, EventArgs e)
@@ -359,11 +418,19 @@ namespace DepartmentModule.Pages
                 using (SqlTransaction transaction = connection.BeginTransaction())
                 using (SqlCommand command = new SqlCommand(
                     @"UPDATE dbo.TechnicalBid SET Status=@Status,Remarks=@Remarks,EvaluatedBy=@UserId,EvaluatedDate=SYSUTCDATETIME()
-                      WHERE TechnicalBidId=@BidId AND TenderId=@TenderId AND Status=N'Submitted';", connection, transaction))
+                      WHERE TechnicalBidId=@BidId AND TenderId=@TenderId AND Status=N'Submitted'
+                        AND EXISTS(SELECT 1 FROM dbo.Tender t WHERE t.TenderId=@TenderId AND t.CurrentStatus=N'Technical Evaluation'
+                                   AND (@Role=N'Admin' OR
+                                        (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                                    WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId IS NOT NULL)
+                                         OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                                   WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId=t.DepartmentId))))
+                        AND EXISTS(SELECT 1 FROM dbo.TenderBidOpening o WHERE o.TenderId=@TenderId);", connection, transaction))
                 {
                     AddText(command, "@Status", SqlDbType.NVarChar, TechnicalStatus.SelectedValue, 30);
                     AddText(command, "@Remarks", SqlDbType.NVarChar, TechnicalRemarks.Text, 1000);
                     ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                    AddText(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
                     ModuleDb.AddParameter(command, "@BidId", SqlDbType.Int, bidId);
                     ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
                     if (command.ExecuteNonQuery() != 1) throw new InvalidOperationException("The bid is no longer awaiting evaluation.");
@@ -392,10 +459,21 @@ namespace DepartmentModule.Pages
                 {
                     using (SqlCommand command = new SqlCommand(
                         @"UPDATE dbo.FinancialBid SET Status=CASE WHEN ContractorId=@ContractorId THEN N'Selected' ELSE N'Rejected' END
-                          WHERE TenderId=@TenderId;", connection, transaction))
+                          WHERE TenderId=@TenderId
+                            AND EXISTS(SELECT 1 FROM dbo.Tender t WHERE t.TenderId=@TenderId
+                                       AND t.CurrentStatus IN (N'Financial Bid Opening',N'CAFO Rate Opinion',
+                                           N'Financial Evaluation',N'MCA Opinion',N'Tender Committee Recommendation',
+                                           N'Final Approval',N'Agreement Completed')
+                                       AND (@Role=N'Admin' OR
+                                            (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                                        WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId IS NOT NULL)
+                                             OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                                       WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId=t.DepartmentId))));", connection, transaction))
                     {
                         ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId);
                         ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                        AddText(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                        ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
                         if (command.ExecuteNonQuery() == 0) throw new InvalidOperationException("No financial bids are available for this tender.");
                     }
                     ModuleDb.AddAudit(connection, transaction, CurrentUserId, "SelectContractor", "FinancialBid", TenderId, SelectionRemarks.Text, Request.UserHostAddress);
@@ -411,6 +489,49 @@ namespace DepartmentModule.Pages
         private void ShowError(string text)
         {
             Message.Text = "<div class=\"message\">" + HttpUtility.HtmlEncode(text) + "</div>";
+        }
+
+        private bool IsBidWindowOpen(SqlConnection connection, SqlTransaction transaction)
+        {
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT COUNT(1)
+                  FROM dbo.Tender t
+                  INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                  WHERE t.TenderId=@TenderId AND t.IsDeleted=0 AND t.CurrentStatus=N'Tender Published'
+                    AND s.PublicationStartUtc<=SYSUTCDATETIME()
+                    AND s.CurrentClosingUtc>SYSUTCDATETIME();", connection, transaction))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                return Convert.ToInt32(command.ExecuteScalar()) == 1;
+            }
+        }
+
+        private void EnsureBidWindowOpen(SqlConnection connection, SqlTransaction transaction)
+        {
+            if (!IsBidWindowOpen(connection, transaction))
+                throw new InvalidOperationException("Bid submission is available only during the approved publication period.");
+        }
+
+        private bool IsBidOpeningRecorded(SqlConnection connection)
+        {
+            using (SqlCommand command = new SqlCommand(
+                "SELECT COUNT(1) FROM dbo.TenderBidOpening WHERE TenderId=@TenderId;", connection))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                return Convert.ToInt32(command.ExecuteScalar()) == 1;
+            }
+        }
+
+        private static bool IsFinancialOpeningOrLater(string status)
+        {
+            string[] statuses =
+            {
+                "Financial Bid Opening", "CAFO Rate Opinion", "Financial Evaluation", "MCA Opinion",
+                "Tender Committee Recommendation", "Final Approval", "Agreement Completed",
+                "Work Order Generated", "Work Started", "Measurement Book Updated", "Bill Submitted",
+                "Bill Approved", "Payment Completed"
+            };
+            return Array.IndexOf(statuses, status) >= 0;
         }
 
         private static bool IsBidStageOrLater(string status)

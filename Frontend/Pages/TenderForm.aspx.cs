@@ -35,14 +35,14 @@ namespace DepartmentModule.Pages
             bool isEditing = EditingTenderId > 0;
             if (isEditing)
             {
-                if (!RequireRoles("Admin")) return;
+                if (!RequireRoles("Admin", "DepartmentOfficer")) return;
             }
             else if (!RequireRoles("DepartmentOfficer", "Admin")) return;
 
             FormTitle.Text = isEditing ? "Edit Tender" : "New Tender";
             FormHeading.Text = isEditing ? "Edit Tender Requirement" : "New Tender Requirement";
             FormDescription.Text = isEditing
-                ? "Only draft tenders can be edited by an administrator."
+                ? "Drafts are editable by administrators. Returned budget proposals can be revised by their owning department officer."
                 : "Create a draft requirement for department processing.";
             CreateButton.Text = isEditing ? "Save Changes" : "Create Tender";
             DepartmentPanel.Visible = !isEditing;
@@ -89,9 +89,22 @@ namespace DepartmentModule.Pages
             using (SqlConnection connection = ModuleDb.OpenConnection())
             using (SqlCommand command = new SqlCommand(
                 @"SELECT Title,Description,EstimatedAmount,TenderType,SubmissionStartDate,SubmissionDeadline,CurrentStatus
-                  FROM dbo.Tender WHERE TenderId=@TenderId AND IsDeleted=0;", connection))
+                  FROM dbo.Tender t
+                  WHERE TenderId=@TenderId AND IsDeleted=0
+                    AND (@Role=N'Admin'
+                         OR (@Role=N'DepartmentOfficer' AND t.CreatedBy=@UserId
+                             AND t.CurrentStatus=N'Budget Revision Required'
+                             AND (@DepartmentId IS NULL OR t.DepartmentId=@DepartmentId)
+                             AND (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                             WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId IS NOT NULL)
+                                  OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                            WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId=t.DepartmentId))));", connection))
             {
                 ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, EditingTenderId);
+                AddText(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                    CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
                 using (SqlDataReader reader = command.ExecuteReader())
                 {
                     if (!reader.Read())
@@ -100,12 +113,17 @@ namespace DepartmentModule.Pages
                         Context.ApplicationInstance.CompleteRequest();
                         return;
                     }
-                    if (!String.Equals(Convert.ToString(reader["CurrentStatus"]), "Draft", StringComparison.OrdinalIgnoreCase))
+                    string status = Convert.ToString(reader["CurrentStatus"]);
+                    if (!String.Equals(status, "Draft", StringComparison.OrdinalIgnoreCase) &&
+                        !String.Equals(status, "Budget Revision Required", StringComparison.OrdinalIgnoreCase))
                     {
-                        ShowError("Only tenders in Draft status can be edited.");
+                        ShowError("This tender is not an editable draft or returned budget proposal.");
                         CreateButton.Enabled = false;
                         return;
                     }
+                    FormDescription.Text = String.Equals(status, "Budget Revision Required", StringComparison.OrdinalIgnoreCase)
+                        ? "Revise the returned estimate and proposal. Submit the updated proposal from tender details when ready."
+                        : "Only administrators can edit a tender that is still in draft.";
 
                     TitleText.Text = Convert.ToString(reader["Title"]);
                     DescriptionText.Text = Convert.ToString(reader["Description"] == DBNull.Value ? String.Empty : reader["Description"]);
@@ -133,7 +151,7 @@ namespace DepartmentModule.Pages
         {
             if (EditingTenderId > 0)
             {
-                if (!HasAnyRole("Admin")) { RequireRoles("Admin"); return; }
+                if (!HasAnyRole("Admin", "DepartmentOfficer")) { RequireRoles("Admin", "DepartmentOfficer"); return; }
             }
             else if (!HasAnyRole("DepartmentOfficer", "Admin"))
             {
@@ -298,28 +316,81 @@ namespace DepartmentModule.Pages
             {
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 using (SqlTransaction transaction = connection.BeginTransaction())
-                using (SqlCommand command = new SqlCommand(
-                    @"UPDATE dbo.Tender
-                      SET Title=@Title,Description=@Description,EstimatedAmount=@Amount,TenderType=@TenderType,
-                          SubmissionStartDate=@StartDate,SubmissionDeadline=@Deadline,
-                          ModifiedBy=@ModifiedBy,ModifiedDate=SYSUTCDATETIME()
-                      WHERE TenderId=@TenderId AND CurrentStatus=N'Draft' AND IsDeleted=0;", connection, transaction))
                 {
-                    AddText(command, "@Title", SqlDbType.NVarChar, TitleText.Text.Trim(), 250);
-                    AddText(command, "@Description", SqlDbType.NVarChar, DescriptionText.Text, -1);
-                    ModuleDb.AddParameter(command, "@Amount", SqlDbType.Decimal, amount);
-                    AddText(command, "@TenderType", SqlDbType.NVarChar, TenderTypeSelect.SelectedValue, 50);
-                    ModuleDb.AddParameter(command, "@StartDate", SqlDbType.DateTime2,
-                        submissionStart.HasValue ? (object)submissionStart.Value : null);
-                    ModuleDb.AddParameter(command, "@Deadline", SqlDbType.DateTime2,
-                        submissionDeadline.HasValue ? (object)submissionDeadline.Value : null);
-                    ModuleDb.AddParameter(command, "@ModifiedBy", SqlDbType.Int, CurrentUserId);
-                    ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, EditingTenderId);
-                    if (command.ExecuteNonQuery() != 1)
-                        throw new InvalidOperationException("Only an existing draft tender can be edited.");
+                    string currentStatus;
+                    using (SqlCommand read = new SqlCommand(
+                        @"SELECT t.CurrentStatus FROM dbo.Tender t WITH (UPDLOCK,ROWLOCK)
+                          WHERE t.TenderId=@TenderId AND t.IsDeleted=0
+                            AND (@Role=N'Admin' OR
+                                 (@Role=N'DepartmentOfficer' AND t.CreatedBy=@UserId
+                                  AND t.CurrentStatus=N'Budget Revision Required'
+                                  AND (@DepartmentId IS NULL OR t.DepartmentId=@DepartmentId)
+                                  AND (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                                  WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId IS NOT NULL)
+                                       OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                                 WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId=t.DepartmentId))));",
+                        connection, transaction))
+                    {
+                        ModuleDb.AddParameter(read, "@TenderId", SqlDbType.Int, EditingTenderId);
+                        AddText(read, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                        ModuleDb.AddParameter(read, "@UserId", SqlDbType.Int, CurrentUserId);
+                        ModuleDb.AddParameter(read, "@DepartmentId", SqlDbType.Int,
+                            CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                        object value = read.ExecuteScalar();
+                        if (value == null || value == DBNull.Value)
+                            throw new InvalidOperationException("This tender cannot be edited in your role or department.");
+                        currentStatus = Convert.ToString(value);
+                    }
+                    if (currentStatus != "Draft" && currentStatus != "Budget Revision Required")
+                        throw new InvalidOperationException("Only a draft or returned budget proposal can be edited.");
 
-                    ModuleDb.AddAudit(connection, transaction, CurrentUserId, "Update", "Tender",
-                        EditingTenderId, null, Request.UserHostAddress);
+                    using (SqlCommand command = new SqlCommand(
+                        @"UPDATE dbo.Tender
+                          SET Title=@Title,Description=@Description,EstimatedAmount=@Amount,TenderType=@TenderType,
+                              SubmissionStartDate=@StartDate,SubmissionDeadline=@Deadline,
+                              ModifiedBy=@ModifiedBy,ModifiedDate=SYSUTCDATETIME()
+                          WHERE TenderId=@TenderId AND CurrentStatus=@ExpectedStatus AND IsDeleted=0
+                            AND (@Role=N'Admin' OR (@Role=N'DepartmentOfficer' AND CreatedBy=@UserId));", connection, transaction))
+                    {
+                        AddText(command, "@Title", SqlDbType.NVarChar, TitleText.Text.Trim(), 250);
+                        AddText(command, "@Description", SqlDbType.NVarChar, DescriptionText.Text, -1);
+                        ModuleDb.AddParameter(command, "@Amount", SqlDbType.Decimal, amount);
+                        AddText(command, "@TenderType", SqlDbType.NVarChar, TenderTypeSelect.SelectedValue, 50);
+                        ModuleDb.AddParameter(command, "@StartDate", SqlDbType.DateTime2,
+                            submissionStart.HasValue ? (object)submissionStart.Value : null);
+                        ModuleDb.AddParameter(command, "@Deadline", SqlDbType.DateTime2,
+                            submissionDeadline.HasValue ? (object)submissionDeadline.Value : null);
+                        ModuleDb.AddParameter(command, "@ModifiedBy", SqlDbType.Int, CurrentUserId);
+                        ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, EditingTenderId);
+                        AddText(command, "@ExpectedStatus", SqlDbType.NVarChar, currentStatus, 50);
+                        AddText(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                        ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                        if (command.ExecuteNonQuery() != 1)
+                            throw new InvalidOperationException("Tender status changed; refresh the page before editing.");
+                    }
+
+                    if (currentStatus == "Budget Revision Required")
+                    {
+                        using (SqlCommand history = new SqlCommand(
+                            @"INSERT INTO dbo.TenderLifecycleHistory
+                                (TenderId,PreviousStatus,NewStatus,ActionName,ActionBy,RoleAtAction,DepartmentId,Remarks)
+                              VALUES(@TenderId,@Status,@Status,N'Budget proposal revised',@UserId,@Role,@DepartmentId,@Remarks);",
+                            connection, transaction))
+                        {
+                            ModuleDb.AddParameter(history, "@TenderId", SqlDbType.Int, EditingTenderId);
+                            AddText(history, "@Status", SqlDbType.NVarChar, currentStatus, 50);
+                            ModuleDb.AddParameter(history, "@UserId", SqlDbType.Int, CurrentUserId);
+                            AddText(history, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                            ModuleDb.AddParameter(history, "@DepartmentId", SqlDbType.Int,
+                                CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                            AddText(history, "@Remarks", SqlDbType.NVarChar, DescriptionText.Text, 1000);
+                            history.ExecuteNonQuery();
+                        }
+                    }
+
+                    ModuleDb.AddAudit(connection, transaction, CurrentUserId,
+                        currentStatus == "Budget Revision Required" ? "ReviseBudgetProposal" : "Update",
+                        "Tender", EditingTenderId, null, Request.UserHostAddress);
                     transaction.Commit();
                 }
 

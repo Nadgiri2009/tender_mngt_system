@@ -3,7 +3,7 @@
 <asp:Content ID="Main" ContentPlaceHolderID="MainContent" runat="server">
     <div class="page-heading"><div><h1>Bids</h1><div class="muted"><asp:Literal ID="TenderNumber" runat="server" /> · <asp:Literal ID="TenderTitle" runat="server" /></div></div><asp:HyperLink ID="BackLink" runat="server" CssClass="button secondary">Tender details</asp:HyperLink></div>
     <asp:Literal ID="Message" runat="server" />
-    <section class="card">
+    <section class="card" id="TechnicalBidsSection" runat="server">
         <h2>Technical bids</h2>
         <asp:Panel ID="TechnicalSubmissionPanel" runat="server" CssClass="card">
             <h3>Submit technical bid</h3>
@@ -21,6 +21,11 @@
         <div class="table-wrap"><asp:GridView ID="TechnicalGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No technical bids submitted yet.">
             <Columns>
                 <asp:BoundField DataField="ContractorName" HeaderText="Contractor" />
+                <asp:TemplateField HeaderText="Bid document"><ItemTemplate>
+                    <asp:HyperLink ID="TechnicalBidDocumentLink" runat="server" Text="View document"
+                        NavigateUrl='<%# ResolveUrl("~/Pages/DocumentDownload.aspx?technicalBidId=" + Eval("TechnicalBidId")) %>'
+                        Visible='<%# !String.IsNullOrWhiteSpace(Convert.ToString(Eval("DocumentPath"))) %>' />
+                </ItemTemplate></asp:TemplateField>
                 <asp:BoundField DataField="Status" HeaderText="Status" />
                 <asp:BoundField DataField="SubmittedDate" HeaderText="Submitted" DataFormatString="{0:dd MMM yyyy HH:mm}" />
                 <asp:BoundField DataField="Remarks" HeaderText="Remarks" />
@@ -36,7 +41,7 @@
             <asp:Button ID="EvaluateButton" runat="server" Text="Record evaluation" OnClick="EvaluateButton_Click" />
         </asp:Panel>
     </section>
-    <section class="card">
+    <section class="card" id="FinancialBidsSection" runat="server">
         <h2>Financial bids (lowest bid ranks first)</h2>
         <asp:Panel ID="FinancialSubmissionPanel" runat="server" CssClass="card">
             <h3>Submit financial bid</h3>

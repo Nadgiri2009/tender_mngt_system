@@ -8,9 +8,12 @@ namespace DepartmentModule.Pages
 {
     public partial class DepartmentDashboard : ModulePage
     {
-        protected Literal Message, TotalTenders, ApprovedTenders, PendingCount, RejectedTenders, UnderReviewTenders, RecentHeading;
+        protected Literal Message, TotalTenders, ApprovedTenders, PendingCount, RejectedTenders, UnderReviewTenders, RecentHeading,
+            LifecyclePendingApprovals, LifecycleAwaitingPublication, LifecyclePublished, LifecycleExtensions,
+            LifecycleBidOpenings, LifecycleAwaitingEvaluation, LifecycleUnderEvaluation;
         protected HyperLink NewTenderLink;
-        protected Panel PendingApprovalsPanel;
+        protected Panel PendingApprovalsPanel, LifecycleSummaryPanel;
+        protected System.Web.UI.WebControls.PlaceHolder LifecycleReviewSummaryPanel;
         protected GridView PendingGrid, RecentGrid, CategoryStatsGrid, UpcomingGrid;
 
         protected void Page_Load(object sender, EventArgs e)
@@ -20,6 +23,8 @@ namespace DepartmentModule.Pages
                 bool isRespOfficer = HasAnyRole("DepartmentOfficer");
                 NewTenderLink.Visible = HasAnyRole("DepartmentOfficer", "Admin");
                 PendingApprovalsPanel.Visible = !isRespOfficer;
+                LifecycleSummaryPanel.Visible = !HasAnyRole("Contractor");
+                LifecycleReviewSummaryPanel.Visible = HasAnyRole("CAFOOfficer", "TenderSection", "TenderCommittee", "Admin");
                 RecentHeading.Text = isRespOfficer ? "My recent tenders" : "Recently updated tenders";
                 LoadDashboard();
             }
@@ -70,6 +75,7 @@ namespace DepartmentModule.Pages
                         }
                     }
 
+                    BindLifecycleSummary(connection, ownerFilter, isRespOfficer);
                     BindDashboardTables(connection, isRespOfficer, ownerFilter);
                 }
             }
@@ -77,6 +83,67 @@ namespace DepartmentModule.Pages
             {
                 Trace.Warn("DepartmentModule", "Could not load the department dashboard.", ex);
                 Message.Text = "<div class=\"message\">Dashboard data could not be loaded. Please retry or contact support.</div>";
+            }
+        }
+
+        private void BindLifecycleSummary(SqlConnection connection, string ownerFilter, bool isRespOfficer)
+        {
+            bool isAdmin = HasAnyRole("Admin");
+            string departmentFilter = isAdmin ? String.Empty :
+                @" AND (@DepartmentId IS NULL OR t.DepartmentId=@DepartmentId)
+                   AND (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                   WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId IS NOT NULL)
+                        OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                  WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId=t.DepartmentId))";
+            string tenderScope = "t.IsDeleted=0" + ownerFilter + departmentFilter;
+            string[] pendingStatuses = WorkflowRules.PendingStatusesForRole(CurrentRole);
+            string[] pendingParameters = new string[pendingStatuses.Length];
+            for (int i = 0; i < pendingStatuses.Length; i++) pendingParameters[i] = "@LifecycleStatus" + i;
+            string pendingPredicate = pendingStatuses.Length == 0
+                ? "1=0"
+                : "t.CurrentStatus IN (" + String.Join(",", pendingParameters) + ")";
+
+            string sql = @"SELECT
+                (SELECT COUNT(*) FROM dbo.Tender t WHERE " + tenderScope + " AND " + pendingPredicate + @") AS PendingApprovals,
+                (SELECT COUNT(*) FROM dbo.Tender t LEFT JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                 WHERE " + tenderScope + @" AND t.CurrentStatus=N'Tender Published'
+                   AND (s.TenderId IS NULL OR s.PublicationStartUtc>SYSUTCDATETIME())) AS AwaitingPublication,
+                (SELECT COUNT(*) FROM dbo.Tender t INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                 WHERE " + tenderScope + @" AND t.CurrentStatus=N'Tender Published'
+                   AND s.PublicationStartUtc<=SYSUTCDATETIME() AND s.CurrentClosingUtc>SYSUTCDATETIME()) AS CurrentlyPublished,
+                (SELECT COUNT(*) FROM dbo.TenderExtensionRequests e INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                 WHERE " + tenderScope + @" AND e.ReviewStatus=N'Pending') AS ExtensionRequests,
+                (SELECT COUNT(*) FROM dbo.Tender t INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                 WHERE " + tenderScope + @" AND t.CurrentStatus=N'Tender Published'
+                   AND s.CurrentClosingUtc<=SYSUTCDATETIME()
+                   AND NOT EXISTS(SELECT 1 FROM dbo.TenderBidOpening o WHERE o.TenderId=t.TenderId)) AS PendingBidOpenings,
+                (SELECT COUNT(*) FROM dbo.TenderEvaluation e INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                 WHERE " + tenderScope + @" AND e.EvaluationStatus=N'Awaiting Evaluation') AS AwaitingEvaluation,
+                (SELECT COUNT(*) FROM dbo.TenderEvaluation e INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                 WHERE " + tenderScope + @" AND e.EvaluationStatus=N'Under Evaluation') AS UnderEvaluation;";
+            using (SqlCommand command = new SqlCommand(sql, connection))
+            {
+                if (isRespOfficer)
+                    ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+                if (!isAdmin)
+                {
+                    ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                        CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                    ModuleDb.AddParameter(command, "@ScopeUserId", SqlDbType.Int, CurrentUserId);
+                }
+                for (int i = 0; i < pendingStatuses.Length; i++)
+                    ModuleDb.AddParameter(command, pendingParameters[i], SqlDbType.NVarChar, pendingStatuses[i], 50);
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    if (!reader.Read()) return;
+                    LifecyclePendingApprovals.Text = Convert.ToString(reader["PendingApprovals"]);
+                    LifecycleAwaitingPublication.Text = Convert.ToString(reader["AwaitingPublication"]);
+                    LifecyclePublished.Text = Convert.ToString(reader["CurrentlyPublished"]);
+                    LifecycleExtensions.Text = Convert.ToString(reader["ExtensionRequests"]);
+                    LifecycleBidOpenings.Text = Convert.ToString(reader["PendingBidOpenings"]);
+                    LifecycleAwaitingEvaluation.Text = Convert.ToString(reader["AwaitingEvaluation"]);
+                    LifecycleUnderEvaluation.Text = Convert.ToString(reader["UnderEvaluation"]);
+                }
             }
         }
 

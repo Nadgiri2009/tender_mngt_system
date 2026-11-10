@@ -19,6 +19,8 @@
                     <asp:HyperLink ID="AdminTendersLink" runat="server" NavigateUrl="~/Pages/Tenders.aspx">Tender management</asp:HyperLink>
                     <asp:HyperLink ID="AdminCreateTenderLink" runat="server" NavigateUrl="~/Pages/TenderForm.aspx">Create tender</asp:HyperLink>
                     <asp:HyperLink ID="ApprovalsLink" runat="server" NavigateUrl="~/Pages/Approvals.aspx">Approvals</asp:HyperLink>
+                    <asp:HyperLink ID="TenderLifecycleLink" runat="server" NavigateUrl="~/Pages/TenderLifecycle.aspx">Publication and extensions</asp:HyperLink>
+                    <asp:HyperLink ID="TenderEvaluationLink" runat="server" NavigateUrl="~/Pages/TenderEvaluation.aspx">Bid opening and evaluation</asp:HyperLink>
                     <asp:HyperLink ID="AdminDepartmentsLink" runat="server" NavigateUrl="~/Pages/AdminDepartments.aspx">Departments</asp:HyperLink>
                     <asp:HyperLink ID="AdminAnnouncementsLink" runat="server" NavigateUrl="~/Pages/AdminAnnouncements.aspx">Announcements</asp:HyperLink>
                     <asp:HyperLink ID="AdminReportsLink" runat="server" NavigateUrl="~/Pages/AdminReports.aspx">Reports</asp:HyperLink>
@@ -42,6 +44,8 @@
                         <a href="<%= ResolveUrl("~/Pages/Home.aspx#announcements") %>">Notices</a>
                         <asp:HyperLink ID="DashboardLink" runat="server" NavigateUrl="~/Pages/Default.aspx" Visible="false">Dashboard</asp:HyperLink>
                         <asp:HyperLink ID="PublicApprovalsLink" runat="server" NavigateUrl="~/Pages/Approvals.aspx" Visible="false">Approvals</asp:HyperLink>
+                        <asp:HyperLink ID="PublicTenderLifecycleLink" runat="server" NavigateUrl="~/Pages/TenderLifecycle.aspx" Visible="false">Publication and extensions</asp:HyperLink>
+                        <asp:HyperLink ID="PublicTenderEvaluationLink" runat="server" NavigateUrl="~/Pages/TenderEvaluation.aspx" Visible="false">Bid opening and evaluation</asp:HyperLink>
                         <asp:HyperLink ID="PublicAdminLink" runat="server" NavigateUrl="~/Pages/Admin.aspx" Visible="false">Administration</asp:HyperLink>
                         <asp:HyperLink ID="LoginLink" runat="server" NavigateUrl="~/Pages/Login.aspx">Login</asp:HyperLink>
                         <asp:HyperLink ID="RegisterLink" runat="server" NavigateUrl="~/Pages/Register.aspx">Register</asp:HyperLink>

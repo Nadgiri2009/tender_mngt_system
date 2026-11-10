@@ -13,7 +13,9 @@ namespace DepartmentModule.Pages
         private const string FeedPageIndexKey = "AdminDashboardFeedPageIndex";
 
         protected Literal Message, TotalTenders, ApprovedTenders, PendingTenders, RejectedTenders, UnderReviewTenders,
-            TotalContractors, ActiveContractors, TotalUsers, ActiveUsers, InactiveContractors, InactiveUsers, Departments, PageSummary;
+            TotalContractors, ActiveContractors, TotalUsers, ActiveUsers, InactiveContractors, InactiveUsers, Departments, PageSummary,
+            LifecyclePendingApprovals, LifecycleAwaitingPublication, LifecyclePublished, LifecycleExtensions,
+            LifecycleBidOpenings, LifecycleAwaitingEvaluation, LifecycleUnderEvaluation;
         protected GridView DashboardFeedGrid, CategoryStatsGrid, UpcomingDeadlinesGrid, RecentTendersGrid;
         protected LinkButton PreviousPageButton, NextPageButton;
         protected Repeater PageNumbers;
@@ -78,12 +80,58 @@ namespace DepartmentModule.Pages
 
                     BindOverviewTables(connection);
                     BindDashboardFeed(connection);
+                    BindLifecycleSummary(connection);
                 }
             }
             catch (SqlException ex)
             {
                 Trace.Warn("DepartmentModule", "Admin dashboard data could not be loaded.", ex);
                 Message.Text = "<div class=\"message\">Dashboard data could not be loaded. Please retry or contact support.</div>";
+            }
+        }
+
+        private void BindLifecycleSummary(SqlConnection connection)
+        {
+            string[] pendingStatuses = WorkflowRules.PendingStatusesForRole(CurrentRole);
+            string[] parameters = new string[pendingStatuses.Length];
+            for (int i = 0; i < pendingStatuses.Length; i++) parameters[i] = "@LifecycleStatus" + i;
+            string pendingPredicate = pendingStatuses.Length == 0
+                ? "1=0"
+                : "t.CurrentStatus IN (" + String.Join(",", parameters) + ")";
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT
+                    (SELECT COUNT(*) FROM dbo.Tender t WHERE t.IsDeleted=0 AND " + pendingPredicate + @") AS PendingApprovals,
+                    (SELECT COUNT(*) FROM dbo.Tender t LEFT JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                     WHERE t.IsDeleted=0 AND t.CurrentStatus=N'Tender Published'
+                       AND (s.TenderId IS NULL OR s.PublicationStartUtc>SYSUTCDATETIME())) AS AwaitingPublication,
+                    (SELECT COUNT(*) FROM dbo.Tender t INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                     WHERE t.IsDeleted=0 AND t.CurrentStatus=N'Tender Published'
+                       AND s.PublicationStartUtc<=SYSUTCDATETIME() AND s.CurrentClosingUtc>SYSUTCDATETIME()) AS CurrentlyPublished,
+                    (SELECT COUNT(*) FROM dbo.TenderExtensionRequests e INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                     WHERE t.IsDeleted=0 AND e.ReviewStatus=N'Pending') AS ExtensionRequests,
+                    (SELECT COUNT(*) FROM dbo.Tender t INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                     WHERE t.IsDeleted=0 AND t.CurrentStatus=N'Tender Published'
+                       AND s.CurrentClosingUtc<=SYSUTCDATETIME()
+                       AND NOT EXISTS(SELECT 1 FROM dbo.TenderBidOpening o WHERE o.TenderId=t.TenderId)) AS PendingBidOpenings,
+                    (SELECT COUNT(*) FROM dbo.TenderEvaluation e INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                     WHERE t.IsDeleted=0 AND e.EvaluationStatus=N'Awaiting Evaluation') AS AwaitingEvaluation,
+                    (SELECT COUNT(*) FROM dbo.TenderEvaluation e INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                     WHERE t.IsDeleted=0 AND e.EvaluationStatus=N'Under Evaluation') AS UnderEvaluation;",
+                connection))
+            {
+                for (int i = 0; i < pendingStatuses.Length; i++)
+                    ModuleDb.AddParameter(command, parameters[i], SqlDbType.NVarChar, pendingStatuses[i], 50);
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    if (!reader.Read()) return;
+                    LifecyclePendingApprovals.Text = Convert.ToString(reader["PendingApprovals"]);
+                    LifecycleAwaitingPublication.Text = Convert.ToString(reader["AwaitingPublication"]);
+                    LifecyclePublished.Text = Convert.ToString(reader["CurrentlyPublished"]);
+                    LifecycleExtensions.Text = Convert.ToString(reader["ExtensionRequests"]);
+                    LifecycleBidOpenings.Text = Convert.ToString(reader["PendingBidOpenings"]);
+                    LifecycleAwaitingEvaluation.Text = Convert.ToString(reader["AwaitingEvaluation"]);
+                    LifecycleUnderEvaluation.Text = Convert.ToString(reader["UnderEvaluation"]);
+                }
             }
         }
 
