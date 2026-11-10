@@ -28,6 +28,7 @@ namespace DepartmentModule.Helpers
                 { "Administrative Approval Pending", Approve("AdministrativeApproval", "Administrative Approved", "DPDCOfficer") },
                 { "Administrative Approved", Submit("BudgetApproval", "Budget Approval Pending", "DepartmentOfficer") },
                 { "Budget Approval Pending", Approve("BudgetApproval", "Budget Approved", "CAFOOfficer") },
+                { "Budget Revision Required", Submit("BudgetRevisionSubmission", "Budget Approval Pending", "DepartmentOfficer") },
                 { "Budget Approved", Submit("TenderDraftPreparation", "Tender Draft Created", "DepartmentOfficer") },
                 { "Tender Draft Created", Submit("TenderCommitteeApproval", "Tender Committee Approval", "DepartmentOfficer") },
                 { "Tender Committee Approval", Approve("TenderCommitteeApproval", "Publication Approval Pending", "TenderCommittee") },
@@ -98,14 +99,16 @@ namespace DepartmentModule.Helpers
                 "N'Work Started',N'Measurement Book Updated',N'Payment Completed'))";
             public const string Pending =
                 "(t.CurrentStatus LIKE N'%Pending%' OR t.CurrentStatus IN " +
-                "(N'Requirement Submitted',N'Estimate Prepared',N'Tender Draft Created',N'Bill Submitted'))";
+                "(N'Requirement Submitted',N'Estimate Prepared',N'Tender Draft Created',N'Bill Submitted'," +
+                "N'Budget Revision Required'))";
             public const string Rejected = "t.CurrentStatus=N'Rejected'";
             public const string UnderReview =
                 "t.CurrentStatus IN (N'Tender Committee Approval',N'Technical Bid Opening',N'Technical Evaluation'," +
                 "N'Financial Bid Opening',N'Financial Evaluation',N'CAFO Rate Opinion',N'MCA Opinion'," +
                 "N'Tender Committee Recommendation')";
             public const string DraftOrSubmitted =
-                "t.CurrentStatus IN (N'Draft',N'Requirement Submitted',N'Estimate Prepared',N'Tender Draft Created')";
+                "t.CurrentStatus IN (N'Draft',N'Requirement Submitted',N'Estimate Prepared',N'Tender Draft Created'," +
+                "N'Budget Revision Required')";
 
         public static string Predicate(string bucket)
         {
@@ -127,6 +130,7 @@ namespace DepartmentModule.Helpers
                 String.Equals(status, "Requirement Submitted", StringComparison.OrdinalIgnoreCase) ||
                 String.Equals(status, "Estimate Prepared", StringComparison.OrdinalIgnoreCase) ||
                 String.Equals(status, "Tender Draft Created", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(status, "Budget Revision Required", StringComparison.OrdinalIgnoreCase) ||
                 String.Equals(status, "Bill Submitted", StringComparison.OrdinalIgnoreCase))
                 return "badge status-pending";
             if ((status != null && status.IndexOf("Approved", StringComparison.OrdinalIgnoreCase) >= 0) ||

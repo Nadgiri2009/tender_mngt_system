@@ -21,8 +21,10 @@
             <p><strong>Tender Type</strong><br /><asp:Literal ID="TenderType" runat="server" /></p>
             <p><strong>Estimated Cost</strong><br />₹<asp:Literal ID="EstimatedAmount" runat="server" /></p>
             <p><strong>Publication Date</strong><br /><asp:Literal ID="PublicationDate" runat="server" /></p>
+            <p><strong>Approved publication period (IST)</strong><br /><asp:Literal ID="PublicationPeriod" runat="server" /></p>
+            <p><strong>Approved extensions</strong><br /><asp:Literal ID="ExtensionCount" runat="server" /></p>
             <p><strong>Submission Start Date</strong><br /><asp:Literal ID="SubmissionStartDate" runat="server" /></p>
-            <p><strong>Submission Deadline</strong><br /><asp:Literal ID="SubmissionDeadline" runat="server" /></p>
+            <p><strong>Legacy submission deadline</strong><br /><asp:Literal ID="SubmissionDeadline" runat="server" /></p>
             <p><strong>Created By</strong><br /><asp:Literal ID="CreatedBy" runat="server" /></p>
             <p><strong>Created Date</strong><br /><asp:Literal ID="CreatedDate" runat="server" /></p>
             <p><strong>Status</strong><br /><span class="badge"><asp:Literal ID="CurrentStatus" runat="server" /></span></p>
@@ -75,6 +77,11 @@
     <asp:Panel ID="AuthenticatedWorkflowPanel" runat="server">
         <section class="card">
             <h2>Workflow action</h2>
+            <asp:Panel ID="BudgetOpinionPanel" runat="server" CssClass="card" Visible="false">
+                <h3>CAFO budget opinion</h3>
+                <p class="help">Choose positive to approve the amount, or negative to return the proposal for JE revision. Previous decisions remain in the history.</p>
+                <div class="field"><label for="ApprovedBudgetAmount">Approved amount (₹) — required for a positive opinion</label><asp:TextBox ID="ApprovedBudgetAmount" runat="server" TextMode="Number" step="0.01" min="0.01" /></div>
+            </asp:Panel>
             <div class="field"><label for="Remarks">Remarks (optional)</label><asp:TextBox ID="Remarks" runat="server" TextMode="MultiLine" MaxLength="1000" Rows="3" /></div>
             <div class="row">
                 <asp:Button ID="SubmitWorkflowButton" runat="server" Text="Submit / Forward" OnClick="SubmitWorkflowButton_Click" />
@@ -83,6 +90,18 @@
             </div>
             <p class="help">Workflow status changes are validated against the current status and the signed-in role before being saved.</p>
         </section>
+        <asp:Panel ID="BudgetOpinionHistoryPanel" runat="server" CssClass="card">
+            <h2>CAFO budget-opinion history</h2>
+            <div class="table-wrap"><asp:GridView ID="BudgetOpinionsGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No budget opinions have been recorded.">
+                <Columns>
+                    <asp:BoundField DataField="Opinion" HeaderText="Opinion" />
+                    <asp:BoundField DataField="ApprovedAmount" HeaderText="Approved amount" DataFormatString="₹{0:N2}" NullDisplayText="—" />
+                    <asp:BoundField DataField="ActionTakenBy" HeaderText="CAFO officer" />
+                    <asp:BoundField DataField="OpinionAtUtc" HeaderText="Date" DataFormatString="{0:dd MMM yyyy HH:mm}" />
+                    <asp:BoundField DataField="Remarks" HeaderText="Remarks" />
+                </Columns>
+            </asp:GridView></div>
+        </asp:Panel>
         <section class="card">
             <div class="page-heading"><h2>Workflow history</h2>
                 <asp:HyperLink ID="BidsLink" runat="server" CssClass="button secondary">Review bids</asp:HyperLink>

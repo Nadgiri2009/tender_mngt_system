@@ -11,8 +11,9 @@ namespace DepartmentModule.Pages
     {
         protected HtmlGenericControl AppLayout, AdminSidebar, PublicNavigation;
         protected HyperLink AdminDashboardLink, AdminUsersLink, AdminTendersLink, AdminCreateTenderLink,
-            ApprovalsLink, AdminDepartmentsLink, AdminAnnouncementsLink, AdminReportsLink, AdminAuditLink,
-            DashboardLink, PublicApprovalsLink, PublicAdminLink, LoginLink, RegisterLink;
+            ApprovalsLink, TenderLifecycleLink, TenderEvaluationLink, AdminDepartmentsLink, AdminAnnouncementsLink,
+            AdminReportsLink, AdminAuditLink, DashboardLink, PublicApprovalsLink, PublicTenderLifecycleLink,
+            PublicTenderEvaluationLink, PublicAdminLink, LoginLink, RegisterLink;
         protected Literal CurrentUser, PublicCurrentUser;
         protected LinkButton SignOutLink, PublicSignOutLink;
 
@@ -33,7 +34,9 @@ namespace DepartmentModule.Pages
                  String.Equals(path, "~/Pages/Tenders.aspx", StringComparison.OrdinalIgnoreCase) ||
                  String.Equals(path, "~/Pages/TenderForm.aspx", StringComparison.OrdinalIgnoreCase) ||
                  String.Equals(path, "~/Pages/Bids.aspx", StringComparison.OrdinalIgnoreCase) ||
-                 String.Equals(path, "~/Pages/WorkManagement.aspx", StringComparison.OrdinalIgnoreCase));
+                 String.Equals(path, "~/Pages/WorkManagement.aspx", StringComparison.OrdinalIgnoreCase) ||
+                 String.Equals(path, "~/Pages/TenderLifecycle.aspx", StringComparison.OrdinalIgnoreCase) ||
+                 String.Equals(path, "~/Pages/TenderEvaluation.aspx", StringComparison.OrdinalIgnoreCase));
 
             AppLayout.Attributes["class"] = isAdminWorkspace
                 ? "app-shell admin-layout"
@@ -45,12 +48,18 @@ namespace DepartmentModule.Pages
             AdminTendersLink.Visible = isAdminWorkspace;
             AdminCreateTenderLink.Visible = isAdminWorkspace;
             ApprovalsLink.Visible = isAdminWorkspace;
+            TenderLifecycleLink.Visible = isAdminWorkspace;
+            TenderEvaluationLink.Visible = isAdminWorkspace;
             AdminDepartmentsLink.Visible = isAdminWorkspace;
             AdminAnnouncementsLink.Visible = isAdminWorkspace;
             AdminReportsLink.Visible = isAdminWorkspace;
             AdminAuditLink.Visible = isAdminWorkspace;
             DashboardLink.Visible = signedIn && !isAdminWorkspace;
             PublicApprovalsLink.Visible = signedIn && !isAdminWorkspace;
+            PublicTenderLifecycleLink.Visible = signedIn && !isAdminWorkspace &&
+                HasRole(role, "DepartmentOfficer", "CAFOOfficer", "Admin");
+            PublicTenderEvaluationLink.Visible = signedIn && !isAdminWorkspace &&
+                HasRole(role, "CAFOOfficer", "TenderCommittee", "TenderSection", "Admin");
             PublicAdminLink.Visible = signedIn && isAdmin && !isAdminWorkspace;
             LoginLink.Visible = !signedIn;
             RegisterLink.Visible = !signedIn && !isLoginPage;
@@ -84,6 +93,18 @@ namespace DepartmentModule.Pages
             ApprovalsLink.CssClass = String.Equals(path, "~/Pages/Approvals.aspx", StringComparison.OrdinalIgnoreCase)
                 ? "is-current"
                 : String.Empty;
+            TenderLifecycleLink.CssClass = String.Equals(path, "~/Pages/TenderLifecycle.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
+            TenderEvaluationLink.CssClass = String.Equals(path, "~/Pages/TenderEvaluation.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
+            PublicTenderLifecycleLink.CssClass = String.Equals(path, "~/Pages/TenderLifecycle.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
+            PublicTenderEvaluationLink.CssClass = String.Equals(path, "~/Pages/TenderEvaluation.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
             AdminDepartmentsLink.CssClass = String.Equals(path, "~/Pages/AdminDepartments.aspx", StringComparison.OrdinalIgnoreCase)
                 ? "is-current"
                 : String.Empty;
@@ -111,6 +132,15 @@ namespace DepartmentModule.Pages
             RegisterLink.CssClass = String.Equals(path, "~/Pages/Register.aspx", StringComparison.OrdinalIgnoreCase)
                 ? "is-current"
                 : String.Empty;
+        }
+
+        private static bool HasRole(string role, params string[] permittedRoles)
+        {
+            foreach (string permittedRole in permittedRoles)
+            {
+                if (String.Equals(role, permittedRole, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
 
         protected void SignOutLink_Click(object sender, EventArgs e)

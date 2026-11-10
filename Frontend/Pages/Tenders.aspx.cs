@@ -100,14 +100,15 @@ namespace DepartmentModule.Pages
                 return;
             }
             string filter = @" FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
+                               LEFT JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
                                LEFT JOIN dbo.Users u ON u.UserId=t.CreatedBy
                                WHERE t.IsDeleted=0 AND (@Search=N'' OR t.Title LIKE @SearchPattern OR t.TenderNumber LIKE @SearchPattern)
                                AND (@Status=N'' OR t.CurrentStatus=@Status" +
                                (statusBucket == null ? String.Empty : " OR (" + statusBucket + ")") +
                                @")
                                AND (@Category=N'' OR t.TenderType=@Category)
-                               AND (@DateFrom IS NULL OR t.SubmissionDeadline>=@DateFrom)
-                               AND (@DateTo IS NULL OR t.SubmissionDeadline<DATEADD(DAY,1,@DateTo))
+                               AND (@DateFrom IS NULL OR COALESCE(s.CurrentClosingUtc,t.SubmissionDeadline)>=@DateFrom)
+                               AND (@DateTo IS NULL OR COALESCE(s.CurrentClosingUtc,t.SubmissionDeadline)<DATEADD(DAY,1,@DateTo))
                                AND (@DepartmentId=0 OR t.DepartmentId=@DepartmentId)" + ownerFilter;
             try
             {
@@ -127,7 +128,9 @@ namespace DepartmentModule.Pages
                                  COALESCE(u.FullName,N'') AS AssignedOfficer,t.EstimatedAmount,
                                  (SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
                                   WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
-                                 t.SubmissionStartDate,t.SubmissionDeadline,t.CurrentStatus,t.CreatedDate " + filter +
+                                 COALESCE(s.PublicationStartUtc,t.SubmissionStartDate) AS SubmissionStartDate,
+                                 COALESCE(s.CurrentClosingUtc,t.SubmissionDeadline) AS SubmissionDeadline,
+                                 t.CurrentStatus,t.CreatedDate " + filter +
                         " ORDER BY " + orderColumn + " " + orderDirection + " OFFSET @Offset ROWS FETCH NEXT 10 ROWS ONLY;", connection))
                     {
                         AddFilterParameters(listCommand, dateFrom, dateTo);

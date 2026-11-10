@@ -16,6 +16,29 @@ namespace DepartmentModule.Pages
 
         protected void Page_Load(object sender, EventArgs e)
         {
+            int extensionRequestId = QueryId("extensionRequestId");
+            if (extensionRequestId > 0)
+            {
+                string kind = Convert.ToString(Request.QueryString["kind"]);
+                if (kind != "application" && kind != "supporting") { NotFound(); return; }
+                DownloadExtensionDocument(extensionRequestId, kind);
+                return;
+            }
+
+            int evaluationDocumentId = QueryId("evaluationDocumentId");
+            if (evaluationDocumentId > 0)
+            {
+                DownloadEvaluationDocument(evaluationDocumentId);
+                return;
+            }
+
+            int technicalBidId = QueryId("technicalBidId");
+            if (technicalBidId > 0)
+            {
+                DownloadTechnicalBidDocument(technicalBidId);
+                return;
+            }
+
             int documentId = QueryId("id");
             if (documentId <= 0) { NotFound(); return; }
             string storedPath;
@@ -34,7 +57,12 @@ namespace DepartmentModule.Pages
                                  WHERE publicHistory.TenderId=t.TenderId AND publicHistory.NewStatus=N'Tender Published'))
                             OR (@CurrentUserId>0 AND @CurrentRole<>N'Contractor'
                                 AND (@CurrentRole<>N'DepartmentOfficer' OR t.CreatedBy=@CurrentUserId))
-                        );", connection))
+                        )
+                        AND (@CurrentUserId=0 OR @CurrentRole=N'Contractor' OR @CurrentRole=N'Admin'
+                             OR NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                           WHERE scopeUser.UserId=@CurrentUserId
+                                             AND scopeUser.DepartmentId IS NOT NULL
+                                             AND scopeUser.DepartmentId<>t.DepartmentId));", connection))
                 {
                     ModuleDb.AddParameter(command, "@DocumentId", SqlDbType.Int, documentId);
                     ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
@@ -55,6 +83,157 @@ namespace DepartmentModule.Pages
                 return;
             }
 
+            SendStoredFile(storedPath, fileName);
+        }
+
+        private void DownloadExtensionDocument(int requestId, string kind)
+        {
+            if (!HasAnyRole("DepartmentOfficer", "CAFOOfficer", "Admin")) { NotFound(); return; }
+            string storedPath, fileName;
+            bool isAdmin = HasAnyRole("Admin");
+            string departmentScope = isAdmin ? String.Empty :
+                @" AND (@DepartmentId IS NULL OR t.DepartmentId=@DepartmentId)
+                   AND (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                   WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId IS NOT NULL)
+                        OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                  WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId=t.DepartmentId))";
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                using (SqlCommand command = new SqlCommand(
+                    @"SELECT CASE WHEN @Kind=N'application' THEN e.ApplicationFilePath ELSE e.SupportingFilePath END AS FilePath,
+                             CASE WHEN @Kind=N'application' THEN e.ApplicationFileName ELSE e.SupportingFileName END AS FileName
+                      FROM dbo.TenderExtensionRequests e
+                      INNER JOIN dbo.Tender t ON t.TenderId=e.TenderId
+                      WHERE e.ExtensionRequestId=@RequestId AND t.IsDeleted=0 AND
+                        (@Role=N'Admin'
+                         OR (@Role=N'DepartmentOfficer' AND e.SubmittedBy=@UserId)
+                         OR @Role=N'CAFOOfficer')" + departmentScope + ";", connection))
+                {
+                    ModuleDb.AddParameter(command, "@Kind", SqlDbType.NVarChar, kind, 12);
+                    ModuleDb.AddParameter(command, "@RequestId", SqlDbType.Int, requestId);
+                    ModuleDb.AddParameter(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                    ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                    if (!isAdmin)
+                    {
+                        ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                            CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                        ModuleDb.AddParameter(command, "@ScopeUserId", SqlDbType.Int, CurrentUserId);
+                    }
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (!reader.Read()) { NotFound(); return; }
+                        storedPath = Convert.ToString(reader["FilePath"]);
+                        fileName = TenderLifecycleFiles.SafeFileName(Convert.ToString(reader["FileName"]));
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Extension document metadata could not be read.", ex);
+                Response.StatusCode = 500;
+                Context.ApplicationInstance.CompleteRequest();
+                return;
+            }
+            SendStoredFile(storedPath, fileName);
+        }
+
+        private void DownloadEvaluationDocument(int documentId)
+        {
+            if (!HasAnyRole("TenderSection", "TenderCommittee", "Admin")) { NotFound(); return; }
+            string storedPath, fileName;
+            bool isAdmin = HasAnyRole("Admin");
+            string departmentScope = isAdmin ? String.Empty :
+                @" AND (@DepartmentId IS NULL OR t.DepartmentId=@DepartmentId)
+                   AND (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                   WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId IS NOT NULL)
+                        OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                  WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId=t.DepartmentId))";
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                using (SqlCommand command = new SqlCommand(
+                    @"SELECT d.FilePath,d.FileName
+                      FROM dbo.TenderEvaluationDocuments d
+                      INNER JOIN dbo.Tender t ON t.TenderId=d.TenderId
+                      WHERE d.EvaluationDocumentId=@DocumentId AND t.IsDeleted=0
+                        AND EXISTS(SELECT 1 FROM dbo.TenderBidOpening o WHERE o.TenderId=t.TenderId)" +
+                    departmentScope + ";", connection))
+                {
+                    ModuleDb.AddParameter(command, "@DocumentId", SqlDbType.Int, documentId);
+                    if (!isAdmin)
+                    {
+                        ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                            CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                        ModuleDb.AddParameter(command, "@ScopeUserId", SqlDbType.Int, CurrentUserId);
+                    }
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (!reader.Read()) { NotFound(); return; }
+                        storedPath = Convert.ToString(reader["FilePath"]);
+                        fileName = TenderLifecycleFiles.SafeFileName(Convert.ToString(reader["FileName"]));
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Evaluation document metadata could not be read.", ex);
+                Response.StatusCode = 500;
+                Context.ApplicationInstance.CompleteRequest();
+                return;
+            }
+            SendStoredFile(storedPath, fileName);
+        }
+
+        private void DownloadTechnicalBidDocument(int technicalBidId)
+        {
+            if (!HasAnyRole("TenderSection", "TenderCommittee", "Admin")) { NotFound(); return; }
+            string storedPath, fileName;
+            bool isAdmin = HasAnyRole("Admin");
+            string departmentScope = isAdmin ? String.Empty :
+                @" AND (@DepartmentId IS NULL OR t.DepartmentId=@DepartmentId)
+                   AND (NOT EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                   WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId IS NOT NULL)
+                        OR EXISTS(SELECT 1 FROM dbo.Users scopeUser
+                                  WHERE scopeUser.UserId=@ScopeUserId AND scopeUser.DepartmentId=t.DepartmentId))";
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                using (SqlCommand command = new SqlCommand(
+                    @"SELECT b.DocumentPath,b.TenderId
+                      FROM dbo.TechnicalBid b
+                      INNER JOIN dbo.Tender t ON t.TenderId=b.TenderId
+                      WHERE b.TechnicalBidId=@BidId AND t.IsDeleted=0
+                        AND EXISTS(SELECT 1 FROM dbo.TenderBidOpening o WHERE o.TenderId=t.TenderId)" +
+                    departmentScope + ";", connection))
+                {
+                    ModuleDb.AddParameter(command, "@BidId", SqlDbType.Int, technicalBidId);
+                    if (!isAdmin)
+                    {
+                        ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                            CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                        ModuleDb.AddParameter(command, "@ScopeUserId", SqlDbType.Int, CurrentUserId);
+                    }
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (!reader.Read() || reader["DocumentPath"] == DBNull.Value) { NotFound(); return; }
+                        storedPath = Convert.ToString(reader["DocumentPath"]);
+                    }
+                }
+                fileName = Path.GetFileName(storedPath);
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Technical bid document metadata could not be read.", ex);
+                Response.StatusCode = 500;
+                Context.ApplicationInstance.CompleteRequest();
+                return;
+            }
+            SendStoredFile(storedPath, fileName);
+        }
+
+        private void SendStoredFile(string storedPath, string fileName)
+        {
             string normalized = (storedPath ?? String.Empty).Replace('\\', '/').TrimStart('/');
             if (normalized.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
                 normalized = normalized.Substring("uploads/".Length);
