@@ -80,24 +80,29 @@ from the DTOs in `TenderManagement.Application/DTOs`.
 
 ## Configuration
 
-`appsettings.json` ships with **no real credentials or secrets** — only structural defaults:
-- `ConnectionStrings:DefaultConnection` defaults to Windows Authentication against
-  `localhost\SQLEXPRESS`. For SQL Authentication instead, replace it with:
-  `Server=<host>,<port>;Database=TenderManagementDB;User Id=<user>;Password=<password>;TrustServerCertificate=True;MultipleActiveResultSets=true`
-- `Jwt:Key` ships **empty on purpose**. `Program.cs` checks this at startup and throws a clear error
-  (rather than a cryptic crypto exception) if it's missing or under 32 characters. Set a real one via
-  user-secrets (recommended for local dev — never gets committed):
-  ```bash
-  dotnet user-secrets init
-  dotnet user-secrets set "Jwt:Key" "$(openssl rand -base64 64)"
-  ```
-  or as an environment variable (`Jwt__Key=...`) in any deployed environment.
-- `Cors:AllowedOrigins` — add your deployed frontend's origin.
+For local development, configure the API to use Windows Authentication with the SQL Express
+instance `localhost\SQLEXPRESS02` and database `TenderManagementDB`. The API process must run as a
+Windows account that has access to that database. Store configuration in .NET user-secrets rather
+than committing local credentials:
+
+```powershell
+$project = "Backend\src\TenderManagement.API\TenderManagement.API.csproj"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost\SQLEXPRESS02;Database=TenderManagementDB;Integrated Security=True;TrustServerCertificate=True;Encrypt=False;MultipleActiveResultSets=true" --project $project
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$bytes = New-Object byte[] 64
+$rng.GetBytes($bytes)
+dotnet user-secrets set "Jwt:Key" ([Convert]::ToBase64String($bytes)) --project $project
+$rng.Dispose()
+```
+
+`Jwt:Key` must be at least 32 characters. It may also be supplied as the `Jwt__Key` environment
+variable in deployed environments. The structural example configuration is in
+`src/TenderManagement.API/appsettings.Example.json`; keep real keys and passwords out of that file.
+`Cors:AllowedOrigins` should include the deployed frontend's origin.
 
 ## Running tests / sanity-checking
 
-This bundle was authored without a live .NET SDK + NuGet feed in the build environment, so it
-hasn't been through `dotnet build` here — it has been written and reviewed carefully for
-correctness (consistent namespaces, EF Core attribute usage, nullable-reference compliance), but
-please run `dotnet restore && dotnet build` as your first step and treat any compiler warnings as
-the place to start if something doesn't compile in your toolchain version.
+From the repository root, build the API with
+`dotnet build Backend\src\TenderManagement.API\TenderManagement.API.csproj`. Run it with
+`dotnet run --project Backend\src\TenderManagement.API\TenderManagement.API.csproj`; in
+Development, Swagger is available at `http://localhost:5050/swagger`.

@@ -1,6 +1,6 @@
 # Tender Management System
 
-The active application stack is **Next.js 15 / React / TypeScript** in this directory, the **ASP.NET Core 8 API** in `../Backend`, and **SQL Server**. Next.js routes live under `app/`; shared UI and API clients live under `src/`. The frontend calls the API at `NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:5000/api`).
+The active application stack is **Next.js 15 / React / TypeScript** in this directory, the **ASP.NET Core 8 API** in `../Backend`, and **SQL Server**. Next.js routes live under `app/`; shared UI and API clients live under `src/`. The frontend calls the API at `NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:5050/api`).
 
 For local development, run `npm ci` and `npm run dev` from `Frontend`, then run the API with `dotnet run --project Backend\src\TenderManagement.API\TenderManagement.API.csproj` from the repository root. Configure the API's SQL Server connection string and JWT key through local user-secrets or environment variables; see [Backend configuration](../Backend/README.md#configuration). The database remains SQL Server and is provisioned using the scripts under `../Database`.
 
