@@ -5,21 +5,21 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 217 33% 17%;
+    --foreground: 282 21% 16%;
 
     --card: 0 0% 100%;
-    --card-foreground: 217 33% 17%;
+    --card-foreground: 282 21% 16%;
 
-    --primary: 213 76% 26%;
+    --primary: 306 41% 33%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 25% 96%;
-    --secondary-foreground: 217 33% 17%;
+    --secondary-foreground: 282 21% 16%;
 
     --muted: 210 25% 96%;
     --muted-foreground: 215 16% 42%;
 
-    --accent: 24 94% 50%;
+    --accent: 324 35% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 68% 45%;
@@ -30,14 +30,14 @@
 
     --border: 214 25% 88%;
     --input: 214 25% 88%;
-    --ring: 213 76% 26%;
+    --ring: 324 35% 50%;
 
     --radius: 0.5rem;
 
-    /* Additional govt-portal specific tokens */
-    --navy-950: 217 55% 12%;
-    --navy-900: 217 50% 16%;
-    --saffron: 24 94% 50%;
+    --navy-950: 280 66% 20%;
+    --navy-900: 306 41% 33%;
+    --saffron: 327 69% 85%;
+    --primary-gradient: linear-gradient(110deg, #AC5288 0%, #75316E 50%, #3E1154 100%);
   }
 }
 

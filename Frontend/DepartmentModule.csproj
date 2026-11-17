@@ -61,6 +61,9 @@
     <Compile Include="Pages\Register.aspx.cs"><DependentUpon>Register.aspx</DependentUpon></Compile>
     <Compile Include="Pages\Admin.aspx.cs"><DependentUpon>Admin.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminUsers.aspx.cs"><DependentUpon>AdminUsers.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\AdminRoles.aspx.cs"><DependentUpon>AdminRoles.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\AdminMasterData.aspx.cs"><DependentUpon>AdminMasterData.aspx</DependentUpon></Compile>
+    <Compile Include="Pages\TenderWorkflow.aspx.cs"><DependentUpon>TenderWorkflow.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminAudit.aspx.cs"><DependentUpon>AdminAudit.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminReports.aspx.cs"><DependentUpon>AdminReports.aspx</DependentUpon></Compile>
     <Compile Include="Pages\AdminDepartments.aspx.cs"><DependentUpon>AdminDepartments.aspx</DependentUpon></Compile>
@@ -86,6 +89,9 @@
     <Content Include="Pages\Register.aspx" />
     <Content Include="Pages\Admin.aspx" />
     <Content Include="Pages\AdminUsers.aspx" />
+    <Content Include="Pages\AdminRoles.aspx" />
+    <Content Include="Pages\AdminMasterData.aspx" />
+    <Content Include="Pages\TenderWorkflow.aspx" />
     <Content Include="Pages\AdminAudit.aspx" />
     <Content Include="Pages\AdminReports.aspx" />
     <Content Include="Pages\AdminDepartments.aspx" />
@@ -102,11 +108,8 @@
     <Content Include="Pages\DocumentDownload.aspx" />
     <Content Include="Pages\Error.aspx" />
     <Content Include="Content\Styles.css" />
-    <Content Include="..\Database\DepartmentModuleSchema.sql">
-      <Link>Database\DepartmentModuleSchema.sql</Link>
-    </Content>
-    <Content Include="..\Database\09_AddTenderLifecycle.sql">
-      <Link>Database\09_AddTenderLifecycle.sql</Link>
+    <Content Include="..\SMC_TENDER_DATABASE.sql">
+      <Link>SMC_TENDER_DATABASE.sql</Link>
     </Content>
     <Content Include="README.md" />
     <Content Include="INTEGRATION_GUIDE.md" />

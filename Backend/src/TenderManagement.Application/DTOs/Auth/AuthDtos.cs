@@ -2,13 +2,24 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TenderManagement.Application.DTOs.Auth
 {
-    public class LoginRequestDto
+    /// <summary>Payload for requesting a one-time sign-in code.</summary>
+    public sealed record RequestLoginOtpRequestDto
     {
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
+        [Required, Phone]
+        public required string Mobile { get; init; }
+    }
 
-        [Required, MinLength(6)]
-        public string Password { get; set; } = string.Empty;
+    /// <summary>Generic response returned after a one-time code request.</summary>
+    public sealed record RequestLoginOtpResponseDto(string Message);
+
+    /// <summary>Payload for verifying a one-time sign-in code.</summary>
+    public sealed record LoginRequestDto
+    {
+        [Required, Phone]
+        public required string Mobile { get; init; }
+
+        [Required, RegularExpression(@"^\d{6}$")]
+        public required string Otp { get; init; }
     }
 
     public class RegisterRequestDto

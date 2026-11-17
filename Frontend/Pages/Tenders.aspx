@@ -23,7 +23,8 @@
                 <Columns>
                     <asp:HyperLinkField DataTextField="TenderNumber" DataNavigateUrlFields="TenderId" DataNavigateUrlFormatString="TenderDetails.aspx?id={0}" HeaderText="Tender No." SortExpression="TenderNumber" />
                     <asp:BoundField DataField="Title" HeaderText="Title" SortExpression="Title" />
-                    <asp:BoundField DataField="TenderType" HeaderText="Category" />
+                    <asp:BoundField DataField="TenderCategory" HeaderText="Category" />
+                    <asp:BoundField DataField="TenderType" HeaderText="Tender method" />
                     <asp:BoundField DataField="DepartmentName" HeaderText="Department" />
                     <asp:BoundField DataField="AssignedOfficer" HeaderText="RESP Officer" />
                     <asp:BoundField DataField="PublicationDate" HeaderText="Published" DataFormatString="{0:dd MMM yyyy}" NullDisplayText="-" />

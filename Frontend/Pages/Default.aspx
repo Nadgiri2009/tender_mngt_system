@@ -4,8 +4,32 @@
     <div class="page-heading">
         <div><h1>Department Dashboard</h1><div class="muted">Tender processing and work-management overview.</div></div>
         <asp:HyperLink ID="NewTenderLink" runat="server" NavigateUrl="~/Pages/TenderForm.aspx" CssClass="button">New Tender</asp:HyperLink>
+        <asp:HyperLink ID="WorkflowQueueLink" runat="server" NavigateUrl="~/Pages/TenderWorkflow.aspx" CssClass="button secondary" Visible="false">My workflow queue</asp:HyperLink>
     </div>
     <asp:Literal ID="Message" runat="server" />
+    <asp:Panel ID="FinalWorkflowDashboardPanel" runat="server" Visible="false">
+        <section class="cards dashboard-statistics" aria-label="Assigned workflow summary">
+            <div class="stat"><span class="muted">Assigned tenders</span><strong><asp:Literal ID="FinalQueueCount" runat="server" /></strong></div>
+            <div class="stat"><span class="muted">Verification stages</span><strong><asp:Literal ID="FinalVerificationCount" runat="server" /></strong></div>
+            <div class="stat"><span class="muted">Shortfall actions</span><strong><asp:Literal ID="FinalShortfallCount" runat="server" /></strong></div>
+            <div class="stat"><span class="muted">Approval stages</span><strong><asp:Literal ID="FinalApprovalCount" runat="server" /></strong></div>
+        </section>
+        <section class="card">
+            <div class="page-heading"><div><h2>My assigned workflow queue</h2><div class="muted">Tenders are limited to your role and current workflow assignment.</div></div><a href="TenderWorkflow.aspx">Open queue</a></div>
+            <div class="table-wrap">
+                <asp:GridView ID="FinalWorkflowGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No tenders are currently assigned to you.">
+                    <Columns>
+                        <asp:HyperLinkField DataTextField="TenderNumber" DataNavigateUrlFields="TenderId" DataNavigateUrlFormatString="TenderWorkflow.aspx?id={0}" HeaderText="Tender" />
+                        <asp:BoundField DataField="Title" HeaderText="Title" />
+                        <asp:BoundField DataField="DepartmentName" HeaderText="Department" />
+                        <asp:BoundField DataField="StageName" HeaderText="Stage" />
+                        <asp:BoundField DataField="CurrentStatus" HeaderText="Status" />
+                    </Columns>
+                </asp:GridView>
+            </div>
+        </section>
+    </asp:Panel>
+    <asp:Panel ID="LegacyDashboardPanel" runat="server">
     <section class="cards" aria-label="Tender summary">
         <a class="stat" href="<%= ResolveUrl("~/Pages/Tenders.aspx") %>"><span class="muted">Total tenders</span><strong><asp:Literal ID="TotalTenders" runat="server" /></strong></a>
         <a class="stat" href="<%= ResolveUrl("~/Pages/Tenders.aspx?bucket=Approved") %>"><span class="muted">Approved</span><strong><asp:Literal ID="ApprovedTenders" runat="server" /></strong></a>
@@ -43,7 +67,8 @@
             <Columns>
                 <asp:HyperLinkField DataTextField="TenderNumber" DataNavigateUrlFields="TenderId" DataNavigateUrlFormatString="TenderDetails.aspx?id={0}" HeaderText="Tender No." />
                 <asp:BoundField DataField="Title" HeaderText="Title" />
-                <asp:BoundField DataField="TenderType" HeaderText="Category" />
+                <asp:BoundField DataField="TenderCategory" HeaderText="Category" />
+                <asp:BoundField DataField="TenderType" HeaderText="Tender method" />
                 <asp:BoundField DataField="DepartmentName" HeaderText="Department" />
                 <asp:BoundField DataField="AssignedOfficer" HeaderText="RESP Officer" />
                 <asp:BoundField DataField="PublicationDate" HeaderText="Published" DataFormatString="{0:dd MMM yyyy}" NullDisplayText="-" />
@@ -54,7 +79,7 @@
         </asp:GridView>
     </section>
     <section class="card">
-        <div class="page-heading"><div><h2>Tenders by category</h2><div class="muted">Counts use the existing tender type values.</div></div></div>
+        <div class="page-heading"><div><h2>Tenders by category</h2><div class="muted">Historical tenders without a category remain uncategorized.</div></div></div>
         <asp:GridView ID="CategoryStatsGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No category statistics are available.">
             <Columns>
                 <asp:BoundField DataField="Category" HeaderText="Category" />
@@ -68,7 +93,8 @@
             <Columns>
                 <asp:HyperLinkField DataTextField="TenderNumber" DataNavigateUrlFields="TenderId" DataNavigateUrlFormatString="TenderDetails.aspx?id={0}" HeaderText="Tender No." />
                 <asp:BoundField DataField="Title" HeaderText="Title" />
-                <asp:BoundField DataField="TenderType" HeaderText="Category" />
+                <asp:BoundField DataField="TenderCategory" HeaderText="Category" />
+                <asp:BoundField DataField="TenderType" HeaderText="Tender method" />
                 <asp:BoundField DataField="AssignedOfficer" HeaderText="RESP Officer" />
                 <asp:BoundField DataField="SubmissionStartDate" HeaderText="Submission starts" DataFormatString="{0:dd MMM yyyy}" NullDisplayText="-" />
                 <asp:BoundField DataField="SubmissionDeadline" HeaderText="Submission ends" DataFormatString="{0:dd MMM yyyy}" NullDisplayText="-" />
@@ -76,4 +102,5 @@
             </Columns>
         </asp:GridView>
     </section>
+    </asp:Panel>
 </asp:Content>

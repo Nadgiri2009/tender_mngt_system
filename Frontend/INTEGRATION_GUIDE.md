@@ -28,12 +28,15 @@ Frontend/
     Register.aspx(.cs)
     Admin.aspx(.cs)
     AdminUsers.aspx(.cs)
+    AdminRoles.aspx(.cs)
+    AdminMasterData.aspx(.cs)
     AdminDepartments.aspx(.cs)
     AdminAnnouncements.aspx(.cs)
     Default.aspx(.cs)
     Tenders.aspx(.cs)
     TenderForm.aspx(.cs)
     TenderDetails.aspx(.cs)
+    TenderWorkflow.aspx(.cs)
     Approvals.aspx(.cs)
     Bids.aspx(.cs)
     WorkManagement.aspx(.cs)
@@ -42,13 +45,12 @@ Frontend/
   Content/Styles.css
   README.md
   INTEGRATION_GUIDE.md
-Database/
-  DepartmentModuleSchema.sql
+SMC_TENDER_DATABASE.sql                 authoritative setup and upgrade entry point
 ```
 
 The existing Web Forms project targets **.NET Framework 4.8** and is built from `Frontend/DepartmentModule.csproj`. Its root default document is configured as `Pages/Home.aspx`. It does not require Node.js, the ASP.NET Core API, or Entity Framework.
 
-Migration coverage is not yet complete or end-to-end verified. Contractor-side technical and qualified financial bid submission are implemented on the Web Forms bid page. A newly registered contractor must first be linked to a `dbo.Contractors` record by an administrator in Manage Users. Do not retire the legacy API or treat the migration as feature-complete until remaining behavior has been ported and tested.
+Migration coverage is not yet complete or end-to-end verified. The version-2 finalized workflow supports JE draft creation, draft submission checks, publication scheduling, scoped queue reads, per-tender required document checklists, initial technical bid opening, and JE primary document review. Contractor technical documents are uploaded as files and served through the authorized download handler. Tender Cell verification, shortfall, financial approval/opening, and final-document stages are not implemented yet. A newly registered contractor must first be linked to a `dbo.Contractors` record by an administrator in Manage Users. Do not retire the legacy API or treat the migration as feature-complete until remaining behavior has been implemented and tested.
 
 ## 2. IIS and framework prerequisites
 
@@ -56,11 +58,37 @@ Install .NET Framework 4.8 and the matching targeting pack/build tools. Enable I
 
 ## 3. SQL Server connection string
 
-Set `connectionStrings/TenderManagement` in the module `Web.config` to the existing SQL Server database. Prefer Windows Integrated Security where available. Otherwise use a protected deployment transform or secret provider; do not commit SQL credentials. Grant the application identity only the SQL permissions required by these pages (read and writes to existing department workflow tables).
+Set `connectionStrings/TenderManagement` in the module `Web.config` to the existing SQL Server database. Prefer Windows Integrated Security where available. Otherwise use a protected deployment transform or secret provider; do not commit SQL credentials. Grant the application identity only the SQL permissions required by these pages, including the additive RBAC, workflow, and bidder-document tables introduced by migrations 10-12.
 
-## 4. Database preflight
+## 4. Database setup and upgrade
 
-Run `Database/DepartmentModuleSchema.sql` against `TenderManagementDB`. It checks required table and column presence and makes **no changes**. The department module does not require a schema migration and does not call stored procedures. Do not run the legacy full database setup script against production; it includes sample accounts and legacy stored-procedure definitions. If the database is new, have the database owner provision the existing application schema using the separately approved SQL Server deployment process first.
+`SMC_TENDER_DATABASE.sql` is the single authoritative SQL Server setup file. It supports explicit
+`Fresh` and additive `Upgrade` modes through SQLCMD variables and refuses an unsafe or unsupported
+target. Historical scripts are preserved in a verified archive outside the active project and
+must not be run separately.
+
+For a fresh, empty development database, run from the repository root:
+
+```powershell
+sqlcmd -S "localhost\SQLEXPRESS02" -E -b -v DatabaseName="TenderManagementDB" -v InstallMode=Fresh -v BackupVerified=NO -i "SMC_TENDER_DATABASE.sql"
+```
+
+Never use `Fresh` against a database containing objects or production records. For an existing database, take a full backup and verify a restore, then rehearse the `Upgrade` mode against that isolated restored copy:
+
+```powershell
+sqlcmd -S "localhost\SQLEXPRESS02" -E -b -v DatabaseName="TenderManagementDB_UpgradeTest" -v InstallMode=Upgrade -v BackupVerified=YES -i "SMC_TENDER_DATABASE.sql"
+```
+
+Use the upgrade mode only after confirming its preflight accepts the exact legacy schema and validating row counts, relationships, constraints, procedures, and application behavior. It never deletes existing tables or production records; if the schema differs or migration meaning is ambiguous, stop and prepare a reviewed mapping rather than modifying the script target to bypass checks. Do not run it against the populated `TenderManagementDB` until the backup, isolated rehearsal, and change approval are complete.
+
+Fresh mode leaves every application table empty except for its setup ledger. It does not create
+users, roles, permissions, departments, workflow stages, lookup values, contractors, tenders, bids,
+or sample transactions. Complete trusted account provisioning and configure the required workflow
+before staff use the application. Upgrade mode preserves existing configuration and business rows
+without seeding or overwriting them. The setup records its schema stages in
+`dbo.TenderSchemaMigrations`.
+
+Rollback guidance: the application can be rolled back while leaving these additive schema changes in place. Do not drop the document metadata columns after uploads or verification history have been recorded. Drop the migration-12 checklist table only if it is confirmed empty and no deployed code uses it; otherwise restore a reviewed database backup or keep the additive schema.
 
 ## 5. Entry page and navigation
 
@@ -68,15 +96,15 @@ The configured root entry is `Pages/Home.aspx`; the staff dashboard is `Pages/De
 
 ## 6. Authentication, session, and authorization handoff
 
-The host Department Panel must authenticate the staff member and authorize access before opening the module. The Web Forms module reads these session values:
+The host Department Panel must authenticate the staff member and authorize access before opening the module. The module uses the configured session user-ID key to identify the user, then reloads active role, department, and permissions from SQL Server. Session role and department values are not authorization sources:
 
 | Purpose | Default key | Required value |
 |---|---|---|
 | Database user identity | `UserId` | Positive `dbo.Users.UserId` |
-| Role | `RoleName` | Existing role name such as `DepartmentOfficer`, `CAFOOfficer`, `TenderSection`, or `TenderCommittee` |
-| Department identity | `DepartmentId` | Optional positive `dbo.Departments.DepartmentId` |
+| Role | `RoleName` | Optional display/handoff value; authorization uses active database role assignments |
+| Department identity | `DepartmentId` | Optional display/handoff value; authorization uses active database department assignment |
 
-Set `DepartmentPanelLoginUrl` in `Web.config` to the main panel's actual sign-in URL before integration. The Web Forms project includes public portal login/registration pages, but protected staff pages must continue to use the main panel's authenticated identity. If the host uses other session key names, update `SessionUserIdKey`, `SessionRoleKey`, and `SessionDepartmentIdKey`. The user ID must refer to the same `dbo.Users` row used by existing foreign keys, and the role value must be assigned by the trusted server-side authentication process (never from a request parameter or browser form). `ModulePage` rejects unauthenticated requests and every write handler repeats role and business-rule checks server-side. Draft edits and soft deletion are restricted to `Admin`; only draft tenders can be edited or deleted.
+Set `DepartmentPanelLoginUrl` in `Web.config` to the main panel's actual sign-in URL before integration. The Web Forms project includes public portal login/registration pages, but protected staff pages must continue to use the main panel's authenticated identity. If the host uses other session key names, set `SessionUserIdKey`; the role and department setting names remain for display/handoff compatibility. The user ID must refer to the same `dbo.Users` row used by existing foreign keys and must be established by the trusted server-side authentication process (never from a request parameter or browser form). `ModulePage` rejects unauthenticated/inactive users and loads authorization from the database. JE department access is derived from the user's active department assignment. The new workflow queue additionally requires a matching tender assignment. Existing legacy pages retain their existing workflow authorization rules; the new queue and role-management pages enforce their database permissions server-side. Draft edits and soft deletion in the legacy workflow remain restricted to `Admin`; only draft tenders can be edited or deleted.
 
 Public login uses the registered mobile number and verifies a six-digit one-time code. Contractor registration also requires a mobile OTP before creating the account and no longer requests a password. The contact email remains required by the existing `dbo.Users` schema, but it is not used for authentication. Codes expire after five minutes; verification permits five attempts, and requests are limited to three per session in a 15-minute window. Existing accounts need a registered mobile number; if multiple active accounts share the same normalized mobile number, login refuses to choose an account. OTP delivery uses the shared `Helpers/OtpChallenge.cs` path. The current development configuration uses `OtpDeliveryMode=Console`; for local requests, codes are written to `%TEMP%\TenderManagement-DevelopmentOtp.log` and are not sent by SMS. In a VS Code PowerShell terminal, run `Get-Content "$env:TEMP\TenderManagement-DevelopmentOtp.log" -Wait -Tail 1` to display the latest code and follow later requests. Console delivery refuses non-local requests and must never be enabled in production. When the domain/IP and provider configuration are ready, set `OtpDeliveryMode=Sms` to require SMS delivery (no console fallback on a provider error), or `Auto` to use SMS when all settings are present and otherwise use console output. Configure `SmsGatewayUrl`, `SmsGatewayAppId`, `SmsGatewayUserId`, `SmsGatewayPassword`, `SmsGatewaySender`, `SmsGatewayDltTemplateId`, and `SmsOtpMessageTemplate`; each can instead be supplied as an `SMC_`-prefixed environment variable. The message template must match the sender's DLT registration and include `{OTP}`. Keep SMS credentials outside source control using protected deployment configuration or a secret store. Never use console delivery in production, enable debug compilation, or expose codes in the browser.
 
@@ -85,13 +113,13 @@ The host must enforce its own page authorization for the navigation link, deny u
 ## 7. Naming and configuration conflict prevention
 
 - Keep the existing assembly name `DepartmentModule`; change it consistently if the host already uses that name.
-- Retain the existing `dbo` object names and database. The module creates no tables, indexes, roles, seed data, or procedures.
-- Apply `..\Database\06_AddTenderSubmissionStartDate.sql` to add the nullable submission-start date used by dashboards and tender forms. It is safe to rerun; run `DepartmentModuleSchema.sql` after applying it.
-- `..\Database\07_SeedTenderDashboardDemoData.sql` is an optional development/test-only script. Its opt-in is disabled by default; never enable it against production.
-- The module uses existing `TenderType` values as tender categories and approval history as the publication date. For `DepartmentOfficer` sessions, dashboard data and tender details are limited to records created by that authenticated `UserId`.
+- Use only `SMC_TENDER_DATABASE.sql` for schema installation or the reviewed existing-database upgrade. Do not run retained historical migrations individually.
+- `Tender.TenderType` is the procurement method / legacy value; `Tender.TenderCategory` is separate and nullable for historical rows whose category cannot be inferred. Method and category must not be interchanged.
+- Catalog CRUD is available for tender categories, methods, document types, units, and officer designations; departments and roles/permissions have separate administration pages. Workflow status transitions remain coupled to application rules and are not directly editable from the master-data screen.
+- For `DepartmentOfficer` sessions, dashboard data and tender details are limited to records created by that authenticated `UserId`.
 - Keep its connection string name `TenderManagement`; if merged into a host config, ensure the name is unique and point it to the established DB.
 - Do not overwrite the host's `Web.config`, `Global.asax`, `Site.Master`, `Styles.css`, or application session/authentication settings. Merge only the module's connection-string/appSettings and IIS handlers as needed.
-- Keep upload storage isolated under the configured `UploadRoot` (default `~/Uploads`) and grant write permission only to the IIS app identity. Files are downloaded through the authenticated module handler.
+- Keep upload storage isolated under the configured `UploadRoot` (default `~/Uploads`) and grant write permission only to the IIS app identity. Bidder uploads use generated names under `Uploads/tender-bids/{TenderId}` and are downloaded through the authorization-checked module handler; do not expose stored paths as public URLs.
 - If the host already owns a default page or similar names, retain the existing `Pages/` path rather than overwriting the host page.
 
 ## 8. Protect the main panel
@@ -107,19 +135,21 @@ Use non-production test accounts and a restored/test database:
 3. Confirm department dropdown options come from active SQL Server department rows; check tender number uniqueness under concurrent test submissions.
 4. Edit and soft-delete draft tenders as Admin; verify non-admin users are denied and non-draft tenders cannot be edited or deleted.
 5. Add/remove BOQ items in Draft only and verify computed line amounts and all SQL values persist.
-6. Exercise each submit/approve/reject stage with the correct and incorrect role. Verify invalid transitions do not update `Tender` or `ApprovalHistory`, and valid moves write both atomically.
-7. Confirm pending approvals are role-specific, status/history are accurate, and pagination/filter/search/sorting return expected results.
-8. Evaluate technical bids, verify only `Qualified`/`Disqualified` is accepted, and recommend a financial bidder as Tender Committee. Confirm ranked bids are ordered lowest-first.
-9. Record agreements, work orders, progress (including boundary values 0 and 100), measurements, bill approval, and payment. Verify only an approved bill can be paid and duplicate transaction numbers are rejected.
-10. Upload, download through the authenticated handler, and verify invalid IDs/path traversal cannot read files outside the upload root.
-11. Confirm SQL Server logs/audit records, database reads and writes, session expiry, IIS error logs, and responsive rendering at desktop and mobile widths.
+6. Categorize uploaded proposal files as Tender Proposal, Tender Document, Technical Supporting Document, and Financial Supporting Document. Verify the JE/Department Officer cannot forward preparation until all four categories and at least one BOQ item exist, and can forward after completing the pack.
+7. Approve a publication schedule as CAFO and verify only scheduled published tenders appear on the public homepage with the correct India Standard Time start and closing values.
+8. Exercise each submit/approve/reject stage with the correct and incorrect role. Verify invalid transitions do not update `Tender` or `ApprovalHistory`, and valid moves write both atomically.
+9. Confirm pending approvals are role-specific, status/history are accurate, and pagination/filter/search/sorting return expected results.
+10. Evaluate technical bids, verify only `Qualified`/`Disqualified` is accepted, and recommend a financial bidder as Tender Committee. Confirm ranked bids are ordered lowest-first.
+11. Record agreements, work orders, progress (including boundary values 0 and 100), measurements, bill approval, and payment. Verify only an approved bill can be paid and duplicate transaction numbers are rejected.
+12. Upload, download through the authenticated handler, and verify invalid IDs/path traversal cannot read files outside the upload root.
+13. Confirm SQL Server logs/audit records, database reads and writes, session expiry, IIS error logs, and responsive rendering at desktop and mobile widths.
 
 ## 10. IIS deployment
 
 1. Install the IIS **ASP.NET 4.8**, **.NET Extensibility 4.8**, **ISAPI Extensions**, and **ISAPI Filters** role services, plus the .NET Framework 4.8 runtime. On the build machine, install the .NET Framework 4.8 targeting pack and Visual Studio ASP.NET/Web Build Tools.
 2. Open `Frontend/DepartmentModule.csproj` in Visual Studio, restore NuGet packages, choose **Release**, then select **Publish → Folder** and publish to a clean staging directory. Deploy the full publish output, including `Pages`, `Content`, `bin`, `Global.asax`, and `Web.config`; do not copy only source `.aspx` files. Do not use `dotnet publish` for ASP.NET Core.
 3. In the deployment `Web.config`, set the `TenderManagement` connection string to the production SQL Server/database, preserving encryption and certificate validation. Set `DepartmentPanelLoginUrl` to the intended login route. Do not commit production credentials.
-4. Run `Database/DepartmentModuleSchema.sql` as the read-only preflight against the target database; it does not create missing schema.
+4. Apply the reviewed `SMC_TENDER_DATABASE.sql` mode against the approved target only after a backup/restore test and isolated upgrade rehearsal; the setup file performs its own preflight and post-install checks.
 5. In IIS Manager, create a site or application pointing to the publish directory. Use a dedicated application pool configured for **.NET CLR v4.0**, **Integrated** pipeline, and compatible 64-bit settings; do not select **No Managed Code**.
 6. Bind the site to HTTPS with a trusted TLS certificate. The configured session cookies require SSL (`requireSSL=true`), so test login over HTTPS.
 7. Grant the application-pool identity read/execute access to the published directory and only the necessary SQL permissions. If uploads are enabled, grant write permissions only to the configured `UploadRoot`.
@@ -133,10 +163,10 @@ Use non-production test accounts and a restored/test database:
 - **SQL connection failure:** check the connection string, SQL Server network/firewall, TLS settings, and IIS application-pool identity permissions.
 - **SQL invalid object/column:** run the schema preflight, verify the target database, and coordinate database schema version with the database owner.
 - **Upload failures:** verify request limits, allowed file extension, 20 MB per-file limit, folder write ACL, free disk space, and the configured `UploadRoot`.
-- **403/incorrect approval queue:** verify the trusted role string matches the existing role names exactly and that it has the department panel permission.
+- **403/incorrect workflow queue:** verify the user has an active database role, required JE department, matching workflow assignment, and the required permission mapping.
 - **Missing static styles:** verify `Content/Styles.css` is included in the published output and that the module virtual path is correct.
 - **Workflow conflict:** refresh the tender. Transitions check the current status at write time and reject stale postbacks to prevent overwriting another user's action.
 
 ## Scope preserved
 
-Department-side tender intake, administrator draft editing/deletion, dropdown lookup, draft BOQ and supporting documents, tender search/filter/sort/pagination, defined status sequence, stage-level role gates, approval/rejection history, contractor technical/financial bid submissions, technical bid evaluation, financial bid ranking/recommendation, work execution, measurement books, bill approvals, and payment release are represented in the module. The module also includes public home/login/registration pages and admin user, contractor-profile, department, and announcement management. Verify parity against the retained API before removing it.
+The existing version-1 workflow includes department-side tender intake, administrator draft editing/deletion, draft BOQ and supporting documents, approval/rejection history, contractor bids, technical evaluation, financial recommendation, and work execution records. Version 2 is additive and preserves existing tenders; so far it supports JE intake, checked draft submission, publication scheduling, assigned queues, role administration, and the RBAC/schema foundation. Version-2 bidder verification, shortfall handling, financial approval/opening, work-order/agreement generation, and PDF generation are outstanding. No end-to-end role-isolation or IIS tests have been run. Verify parity against the retained API before removing it.

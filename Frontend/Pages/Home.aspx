@@ -17,11 +17,12 @@
                 </asp:TemplateField>
                 <asp:BoundField DataField="TenderNumber" HeaderText="Tender No." />
                 <asp:BoundField DataField="Title" HeaderText="Tender title" />
-                <asp:BoundField DataField="TenderType" HeaderText="Category" />
+                <asp:BoundField DataField="TenderCategory" HeaderText="Category" />
+                <asp:BoundField DataField="TenderType" HeaderText="Tender method" />
                 <asp:BoundField DataField="DepartmentName" HeaderText="Department" />
                 <asp:BoundField DataField="PublicationDate" HeaderText="Publication date" DataFormatString="{0:dd MMM yyyy}" NullDisplayText="-" />
-                <asp:BoundField DataField="SubmissionStartDate" HeaderText="Submission start" DataFormatString="{0:dd MMM yyyy}" NullDisplayText="-" />
-                <asp:BoundField DataField="SubmissionDeadline" HeaderText="Submission deadline" DataFormatString="{0:dd MMM yyyy}" />
+                <asp:BoundField DataField="PublicationStartUtc" HeaderText="Publication starts (IST)" DataFormatString="{0:dd MMM yyyy HH:mm}" NullDisplayText="-" />
+                <asp:BoundField DataField="CurrentClosingUtc" HeaderText="Publication closes (IST)" DataFormatString="{0:dd MMM yyyy HH:mm}" NullDisplayText="-" />
                 <asp:BoundField DataField="CurrentStatus" HeaderText="Status" />
                 <asp:TemplateField HeaderText="Action">
                     <ItemTemplate>

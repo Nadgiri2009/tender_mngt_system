@@ -28,6 +28,24 @@ namespace DepartmentModule.Pages
             if (!IsPostBack) LoadPage();
         }
 
+        private static string GetAssignableRoleName(SqlConnection connection, SqlTransaction transaction, int roleId)
+        {
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT RoleName FROM dbo.Roles WITH (UPDLOCK,HOLDLOCK)
+                  WHERE RoleId=@RoleId AND IsActive=1 AND RoleName<>N'Super Admin';", connection, transaction))
+            {
+                ModuleDb.AddParameter(command, "@RoleId", SqlDbType.Int, roleId);
+                object value = command.ExecuteScalar();
+                return value == null || value == DBNull.Value ? null : Convert.ToString(value);
+            }
+        }
+
+        private static bool RequiresDepartment(string roleName)
+        {
+            return String.Equals(roleName, "Junior Engineer (JE)", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(roleName, "DepartmentOfficer", StringComparison.OrdinalIgnoreCase);
+        }
+
         protected void Password_ServerValidate(object source, ServerValidateEventArgs args)
         {
             args.IsValid = String.IsNullOrEmpty(args.Value) || args.Value.Length >= 6;
@@ -39,7 +57,8 @@ namespace DepartmentModule.Pages
             {
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 {
-                    using (SqlCommand command = new SqlCommand("SELECT RoleId,RoleName FROM dbo.Roles WHERE IsActive=1 ORDER BY RoleName;", connection))
+                    using (SqlCommand command = new SqlCommand(
+                        "SELECT RoleId,RoleName FROM dbo.Roles WHERE IsActive=1 AND RoleName<>N'Super Admin' ORDER BY RoleName;", connection))
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         RoleSelect.Items.Clear();
@@ -101,7 +120,7 @@ namespace DepartmentModule.Pages
             using (SqlCommand command = new SqlCommand(
                 @"SELECT u.UserId,u.FullName,u.Email
                   FROM dbo.Users u INNER JOIN dbo.Roles r ON r.RoleId=u.RoleId
-                  WHERE r.RoleName=N'Contractor' AND u.IsActive=1
+                  WHERE r.RoleName IN (N'Contractor',N'Contractor / Vendor') AND u.IsActive=1
                     AND NOT EXISTS (SELECT 1 FROM dbo.Contractors c WHERE c.UserId=u.UserId)
                   ORDER BY u.FullName;", connection))
             using (SqlDataReader reader = command.ExecuteReader())
@@ -208,7 +227,6 @@ namespace DepartmentModule.Pages
                 ShowMessage("The selected user, role, or department is invalid.");
                 return;
             }
-
             string fullName = FullNameText.Text.Trim();
             string email = EmailText.Text.Trim();
             string mobile = MobileText.Text.Trim();
@@ -229,6 +247,18 @@ namespace DepartmentModule.Pages
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 using (SqlTransaction transaction = connection.BeginTransaction(System.Data.IsolationLevel.Serializable))
                 {
+                    string selectedRoleName = GetAssignableRoleName(connection, transaction, roleId);
+                    if (selectedRoleName == null)
+                    {
+                        ShowMessage("The selected role is unavailable or requires the trusted Super Admin provisioning process.");
+                        return;
+                    }
+                    if (RequiresDepartment(selectedRoleName) && !optionalDepartmentId.HasValue)
+                    {
+                        ShowMessage("A department must be assigned to every Junior Engineer.");
+                        return;
+                    }
+
                     int currentRoleId;
                     bool isActive;
                     string currentMobile;
@@ -295,7 +325,7 @@ namespace DepartmentModule.Pages
                     }
 
                     ModuleDb.AddAudit(connection, transaction, CurrentUserId, "Update", "User", userId,
-                        "Profile and access settings updated; no credentials recorded.", Request.UserHostAddress);
+                        "Profile and role " + selectedRoleName + " updated; no credentials recorded.", Request.UserHostAddress);
                     transaction.Commit();
                 }
 
@@ -378,6 +408,17 @@ namespace DepartmentModule.Pages
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 using (SqlTransaction transaction = connection.BeginTransaction())
                 {
+                    string selectedRoleName = GetAssignableRoleName(connection, transaction, roleId);
+                    if (selectedRoleName == null)
+                    {
+                        ShowMessage("The selected role is unavailable or requires the trusted Super Admin provisioning process.");
+                        return;
+                    }
+                    if (RequiresDepartment(selectedRoleName) && !optionalDepartmentId.HasValue)
+                    {
+                        ShowMessage("A department must be assigned to every Junior Engineer.");
+                        return;
+                    }
                     int userId;
                     using (SqlCommand command = new SqlCommand(
                         @"INSERT INTO dbo.Users (FullName,Email,Mobile,PasswordHash,RoleId,DepartmentId,IsActive,CreatedDate,CreatedBy)
@@ -395,7 +436,7 @@ namespace DepartmentModule.Pages
                         userId = Convert.ToInt32(command.ExecuteScalar());
                     }
                     ModuleDb.AddAudit(connection, transaction, CurrentUserId, "Create", "User", userId,
-                        "Account created by administrator.", Request.UserHostAddress);
+                        "Account created with role " + selectedRoleName + ".", Request.UserHostAddress);
                     transaction.Commit();
                 }
                 ShowMessage("Staff account created.", true);
@@ -439,7 +480,8 @@ namespace DepartmentModule.Pages
                     int emailRows;
                     using (SqlCommand command = new SqlCommand(
                         @"SELECT COUNT(1) FROM dbo.Users u INNER JOIN dbo.Roles r ON r.RoleId=u.RoleId
-                          WHERE u.UserId=@UserId AND u.IsActive=1 AND r.RoleName=N'Contractor'
+                          WHERE u.UserId=@UserId AND u.IsActive=1
+                            AND r.RoleName IN (N'Contractor',N'Contractor / Vendor')
                             AND NOT EXISTS (SELECT 1 FROM dbo.Contractors c WHERE c.UserId=u.UserId);",
                         connection, transaction))
                     {

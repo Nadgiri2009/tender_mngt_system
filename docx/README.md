@@ -1,5 +1,11 @@
 # Tender Management System
 
+> **Current setup notice:** This document contains historical architecture and workflow notes.
+> The supported SQL Server setup is the repository-root `SMC_TENDER_DATABASE.sql`; do not follow
+> SQL commands, seeded-login instructions, or migration directions in older material. See the
+> root `README.md`, `Frontend/README.md`, and `SMC_TENDER_MASTER_DOCUMENTATION.md` for current
+> setup and deployment guidance.
+
 A full-stack digitization of the traditional tender workflow — from department requirement through
 estimate approval, technical sanction, GB/administrative/budget approvals, tender publication, bid
 opening & evaluation, contractor selection, agreement, work execution, e-MB, billing, and payment
@@ -7,20 +13,18 @@ release — built as a clean, layered, role-based enterprise application.
 
 ```
 TenderMngt/
-├── Database/        SQL Server 2022 schema, stored procedures, seed data, ER diagram
+├── SMC_TENDER_DATABASE.sql  Authoritative SQL Server setup and upgrade
+├── Database/        Database relationship documentation
 ├── Backend/          ASP.NET Core 8 Web API — Clean Architecture (Domain / Application / Infrastructure / API)
 └── Frontend/          React 18 + Material UI SPA
 ```
 
 ## How the pieces fit together
 
-- **Database** — `Database/01_CreateDatabase_Schema.sql` creates every table from the spec (Users,
-  Roles, Departments, Tender, Estimate, ApprovalHistory, TenderDocuments, BOQ, Contractor,
-  TechnicalBid, FinancialBid, Agreement, WorkOrder, WorkExecution, MeasurementBook, Bills, Payments,
-  AuditLog), plus a `WorkflowStages` config table. `02_StoredProcedures.sql` adds the procedures the
-  API calls for the most safety-critical operation (atomic status transition + audit row) and for a
-  few reporting queries. `03_SeedData.sql` seeds only the fixed Roles and the workflow-stage → role
-  mapping — no demo departments, users, or business data of any kind.
+- **Database** — the repository-root `SMC_TENDER_DATABASE.sql` is the only supported SQL Server
+  setup file. Its guarded SQLCMD `Fresh` and `Upgrade` modes create schema while preserving existing
+  data. Fresh mode leaves application and reference tables empty; trusted account and workflow
+  provisioning is required before use.
 
 - **Backend** — four projects:
   - `TenderManagement.Domain` — entities and enums, no dependencies.
@@ -41,18 +45,13 @@ See `Database/ER_Diagram.md` for the entity-relationship diagram (Mermaid).
 
 ## Quick start
 
-1. **Database** (SQL Server 2022 — Express, Developer, or via Docker all work):
+1. **Database** (SQL Server):
    ```bash
-   sqlcmd -S "localhost\SQLEXPRESS" -E -i Database/01_CreateDatabase_Schema.sql
-   sqlcmd -S "localhost\SQLEXPRESS" -E -i Database/02_StoredProcedures.sql
-   sqlcmd -S "localhost\SQLEXPRESS" -E -i Database/03_SeedData.sql
+   sqlcmd -S "localhost\SQLEXPRESS02" -E -b -v DatabaseName="TenderManagementDB" -v InstallMode=Fresh -v BackupVerified=NO -i "SMC_TENDER_DATABASE.sql"
    ```
-   (`-E` = Windows Authentication; swap for `-U sa -P <password>` if you're using SQL auth instead — see
-   `Backend/README.md` for the connection-string equivalent.)
-
-   `03_SeedData.sql` only inserts **Roles** and **WorkflowStages** — fixed reference/config data the
-   app's authorization logic depends on by name. There is no demo Department, no demo Admin user, no
-   placeholder password hash anywhere in this project.
+   Fresh mode is only for a new, empty database. For an existing database, take and restore-test a
+   backup, then rehearse `InstallMode=Upgrade` on an isolated restored copy before production
+   approval. Never run Fresh mode against a populated database.
 
 2. **Backend**:
    ```bash
@@ -79,23 +78,8 @@ See `Database/ER_Diagram.md` for the entity-relationship diagram (Mermaid).
    # http://localhost:3000
    ```
 
-4. **Create your first user** — there's no seeded login. Either use the Swagger UI or call directly:
-   ```bash
-   curl -X POST http://localhost:5000/api/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"fullName":"Your Name","email":"you@example.com","mobile":"9999999999","password":"YourPassword123","roleId":1}'
-   ```
-   `roleId: 1` is Admin (per the seeded Roles table — check `GET /api/roles` to confirm the ids in your
-   database). From there, log in and use Admin > Manage Departments to add real departments before
-   creating tenders.
-
-  Seeded logins (one per role)
-
-  `Database/DatabaseSetup.sql` seeds one login for every role, so the entire tender lifecycle can be
-  walked end-to-end without registering accounts by hand first:
-***REMOVED***
-  These are test credentials — change or remove them before any real deployment (delete the rows
-  from `Users`, or don't run that section of the script).
+4. **Provision users and departments** through the approved trusted administration process after
+   installation. Do not rely on fixed role IDs, sample logins, or automatic Super Admin creation.
 
 ## Officer SOP (PDF-Aligned, End-to-End)
 
@@ -141,7 +125,8 @@ Bilingual handout (Hindi + Marathi): [OFFICER_SOP_PDF_ALIGNED_HI_MR.md](OFFICER_
 Notes:
 - At each step, Approve/Reject is visible only to the mapped role for that status.
 - "Rejected" can occur from approval stages and requires resubmission per department workflow.
-- For existing databases, run `Database/05_AlignTechnicalEvaluationWithPdf.sql` to align Technical Evaluation ownership and stage mapping with this SOP.
+- For existing databases, rehearse the canonical installer's `Upgrade` mode on a verified restored
+  copy; do not run individual historical migration scripts.
 
 ## What's fully implemented vs. left as a clear extension point
 
@@ -165,9 +150,9 @@ dashboard stats · admin user management.
 - *Pagination/search/filter* — implemented on the main Tenders list; the same `PaginationQuery` /
   `GetPagedAsync` pattern is ready to copy onto Bills/Contractors/Users if you want server-side
   paging there too (those currently return full lists, which is fine at expected admin-table scale).
-- *WorkflowStages admin UI* — the table and seed data exist so Admin can reassign which role owns
-  which approval stage, but there's no screen for it yet (today it requires `UPDATE WorkflowStages`
-  or a small admin page calling a new `WorkflowStagesController`).
+- *WorkflowStages admin UI* — the schema exists, but Fresh mode does not seed stage rows and there
+  is no screen for managing them yet. Complete approved workflow provisioning before using
+  role-specific approvals.
 - *Contractor self-service portal* — Contractors authenticate and the API endpoints they need exist
   (submit bids, update progress, submit bills), but there's a single Work hub UI rather than a
   contractor-specific stripped-down view.

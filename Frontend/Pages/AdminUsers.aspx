@@ -6,7 +6,7 @@
     <section class="card">
         <asp:HiddenField ID="UserIdHidden" runat="server" />
         <h2><asp:Literal ID="UserFormHeading" runat="server">Create staff account</asp:Literal></h2>
-        <p class="muted">Public self-registration is restricted to the Contractor role. Staff accounts must be provisioned here.</p>
+        <p class="muted">Public self-registration is restricted to vendors. Staff accounts must be provisioned here. Super Admin assignment is intentionally disabled until an authorized identity has been verified through the trusted provisioning process.</p>
         <div class="field"><asp:Label runat="server" AssociatedControlID="FullNameText">Full name</asp:Label><asp:TextBox ID="FullNameText" runat="server" MaxLength="150" /><asp:RequiredFieldValidator runat="server" ControlToValidate="FullNameText" ValidationGroup="User" CssClass="validation" ErrorMessage="Full name is required." /></div>
         <div class="row">
             <div class="field"><asp:Label runat="server" AssociatedControlID="EmailText">Email</asp:Label><asp:TextBox ID="EmailText" runat="server" TextMode="Email" MaxLength="150" /><asp:RequiredFieldValidator runat="server" ControlToValidate="EmailText" ValidationGroup="User" CssClass="validation" ErrorMessage="Email is required." /></div>
@@ -15,7 +15,7 @@
         <div class="row">
             <div class="field"><asp:Label runat="server" AssociatedControlID="PasswordText">Temporary password (required when creating; optional when editing)</asp:Label><asp:TextBox ID="PasswordText" runat="server" TextMode="Password" autocomplete="new-password" /><asp:CustomValidator runat="server" ControlToValidate="PasswordText" ValidationGroup="User" CssClass="validation" OnServerValidate="Password_ServerValidate" ErrorMessage="Password must be at least 6 characters." /></div>
             <div class="field"><asp:Label runat="server" AssociatedControlID="RoleSelect">Role</asp:Label><asp:DropDownList ID="RoleSelect" runat="server" /><asp:RequiredFieldValidator runat="server" ControlToValidate="RoleSelect" InitialValue="" ValidationGroup="User" CssClass="validation" ErrorMessage="Select a role." /></div>
-            <div class="field"><asp:Label runat="server" AssociatedControlID="DepartmentSelect">Department (optional)</asp:Label><asp:DropDownList ID="DepartmentSelect" runat="server" /></div>
+            <div class="field"><asp:Label runat="server" AssociatedControlID="DepartmentSelect">Department (required for JE)</asp:Label><asp:DropDownList ID="DepartmentSelect" runat="server" /></div>
         </div>
         <div class="admin-actions">
             <asp:Button ID="CreateUserButton" runat="server" Text="Create account" ValidationGroup="User" OnClick="CreateUserButton_Click" />

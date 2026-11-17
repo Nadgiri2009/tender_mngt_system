@@ -17,3 +17,12 @@ export async function fetchTenderTypes(): Promise<string[]> {
     throw toApiError(error);
   }
 }
+
+export async function fetchTenderCategories(): Promise<string[]> {
+  try {
+    const { data } = await apiClient.get<string[]>("/lookups/tender-categories");
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}

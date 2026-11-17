@@ -10,7 +10,7 @@ import { updateTenderSchema, type UpdateTenderFormValues } from "@/lib/validatio
 import { updateTender } from "@/lib/api/tenders";
 import { ApiError } from "@/lib/api/client";
 import type { TenderDetail } from "@/types/tender";
-import { fetchTenderTypes } from "@/lib/api/lookups";
+import { fetchTenderCategories, fetchTenderTypes } from "@/lib/api/lookups";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
       title: tender.title,
       description: tender.description ?? "",
       tenderType: tender.tenderType,
+      tenderCategory: tender.tenderCategory ?? "",
       estimatedAmount: tender.estimatedAmount,
       submissionDeadline: tender.submissionDeadline ?? "",
     },
@@ -51,6 +52,7 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
         description: values.description || undefined,
         estimatedAmount: values.estimatedAmount,
         tenderType: values.tenderType,
+        tenderCategory: values.tenderCategory,
         submissionDeadline: values.submissionDeadline || undefined,
       }),
     onSuccess: (updated) => {
@@ -65,11 +67,16 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
   });
 
   const tenderTypeValue = watch("tenderType");
+  const tenderCategoryValue = watch("tenderCategory");
   const isEditable = tender.currentStatus === "Draft";
 
   const { data: tenderTypes } = useQuery({
     queryKey: ["tender-types"],
     queryFn: fetchTenderTypes,
+  });
+  const { data: tenderCategories } = useQuery({
+    queryKey: ["tender-categories"],
+    queryFn: fetchTenderCategories,
   });
 
   if (!isEditable) {
@@ -112,7 +119,7 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tenderType">Tender Type</Label>
+            <Label htmlFor="tenderType">Tender Method</Label>
             <Select
               value={tenderTypeValue}
               onValueChange={(v) => setValue("tenderType", v, { shouldValidate: true })}
@@ -129,6 +136,26 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
               </SelectContent>
             </Select>
             {errors.tenderType && <p className="text-sm text-destructive">{errors.tenderType.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tenderCategory">Tender Category</Label>
+            <Select
+              value={tenderCategoryValue}
+              onValueChange={(v) => setValue("tenderCategory", v, { shouldValidate: true })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select tender category" />
+              </SelectTrigger>
+              <SelectContent>
+                {tenderCategories?.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.tenderCategory && <p className="text-sm text-destructive">{errors.tenderCategory.message}</p>}
           </div>
 
           <div className="space-y-2">

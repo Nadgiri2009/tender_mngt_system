@@ -5,6 +5,15 @@
     <asp:Literal ID="Message" runat="server" />
     <section class="card" id="TechnicalBidsSection" runat="server">
         <h2>Technical bids</h2>
+        <div class="table-wrap">
+            <h3>Required bidder documents</h3>
+            <asp:GridView ID="RequiredBidDocumentsGrid" runat="server" AutoGenerateColumns="false" GridLines="None"
+                EmptyDataText="No version-2 document checklist is configured for this tender.">
+                <Columns>
+                    <asp:BoundField DataField="DocumentType" HeaderText="Required document type" />
+                </Columns>
+            </asp:GridView>
+        </div>
         <asp:Panel ID="TechnicalSubmissionPanel" runat="server" CssClass="card">
             <h3>Submit technical bid</h3>
             <asp:Literal ID="ContractorProfileMessage" runat="server" />
@@ -12,11 +21,22 @@
                 <label for="TechnicalContractorSelect">Contractor</label>
                 <asp:DropDownList ID="TechnicalContractorSelect" runat="server" />
             </div>
-            <div class="field">
+            <div class="field" id="LegacyDocumentPathField" runat="server">
                 <label for="TechnicalDocumentPathText">Document Path (optional)</label>
                 <asp:TextBox ID="TechnicalDocumentPathText" runat="server" MaxLength="400" />
             </div>
+            <div class="field">
+                <label for="TechnicalDocumentTypeText">Document type</label>
+                <asp:TextBox ID="TechnicalDocumentTypeText" runat="server" MaxLength="160" />
+            </div>
+            <div class="field">
+                <label for="TechnicalDocumentUpload">Technical bid document</label>
+                <asp:FileUpload ID="TechnicalDocumentUpload" runat="server" />
+                <span class="help">PDF, Office, JPEG or PNG; maximum 20 MB.</span>
+            </div>
             <asp:Button ID="SubmitTechnicalButton" runat="server" Text="Submit technical bid" OnClick="SubmitTechnicalButton_Click" />
+            <asp:Button ID="UploadTechnicalDocumentButton" runat="server" Text="Upload additional document"
+                OnClick="UploadTechnicalDocumentButton_Click" Visible="false" />
         </asp:Panel>
         <div class="table-wrap"><asp:GridView ID="TechnicalGrid" runat="server" AutoGenerateColumns="false" GridLines="None" EmptyDataText="No technical bids submitted yet.">
             <Columns>
@@ -31,6 +51,19 @@
                 <asp:BoundField DataField="Remarks" HeaderText="Remarks" />
             </Columns>
         </asp:GridView></div>
+        <div class="table-wrap">
+            <asp:GridView ID="TechnicalDocumentsGrid" runat="server" AutoGenerateColumns="false" GridLines="None"
+                EmptyDataText="No uploaded technical bid documents.">
+                <Columns>
+                    <asp:BoundField DataField="DocumentType" HeaderText="Document type" />
+                    <asp:TemplateField HeaderText="File"><ItemTemplate>
+                        <asp:HyperLink ID="TechnicalDocumentLink" runat="server" Text='<%# Eval("FileName") %>'
+                            NavigateUrl='<%# ResolveUrl("~/Pages/DocumentDownload.aspx?technicalBidDocumentId=" + Eval("TechnicalBidDocumentId")) %>' />
+                    </ItemTemplate></asp:TemplateField>
+                    <asp:BoundField DataField="UploadedDate" HeaderText="Uploaded" DataFormatString="{0:dd MMM yyyy HH:mm}" />
+                </Columns>
+            </asp:GridView>
+        </div>
         <asp:Panel ID="EvaluatePanel" runat="server" CssClass="card">
             <h3>Evaluate a submitted technical bid</h3>
             <div class="row">

@@ -11,7 +11,7 @@
         <h2>Eligible for bid opening</h2>
         <p class="help">A tender appears here only after its approved current closing time has passed. Opening is one-time and recorded against your authenticated account.</p>
         <div class="row">
-            <div class="field"><label for="OpeningDesignation">Opening officer designation</label><asp:TextBox ID="OpeningDesignation" runat="server" MaxLength="150" /></div>
+            <div class="field"><label for="OpeningDesignation">Opening officer designation</label><asp:DropDownList ID="OpeningDesignation" runat="server" /></div>
             <div class="field"><label for="OpeningRemarks">Opening remarks</label><asp:TextBox ID="OpeningRemarks" runat="server" MaxLength="1000" /></div>
         </div>
         <div class="table-wrap">
@@ -74,7 +74,7 @@
             <asp:Button ID="ForwardEvaluationButton" runat="server" Text="Submit recommendation to Tender Committee" OnClick="ForwardEvaluationButton_Click"
                 OnClientClick="return confirm('Submit this evaluation recommendation to the existing Tender Committee workflow?');" />
         </div>
-        <p class="help">The configured one-day delay is enforced by SQL Server. Tender Committee and Competent Authority approvals continue through the existing workflow.</p>
+        <p class="help">Evaluation cannot start until an administrator configures the delay. Tender Committee and Competent Authority approvals continue through the existing workflow.</p>
     </asp:Panel>
 
     <asp:Panel ID="SettingsPanel" runat="server" CssClass="card" Visible="false">
@@ -83,6 +83,6 @@
             <div class="field"><label for="DelayDays">Days after actual bid opening</label><asp:TextBox ID="DelayDays" runat="server" TextMode="Number" min="0" max="365" /></div>
             <asp:Button ID="SaveDelayButton" runat="server" Text="Save evaluation delay" OnClick="SaveDelayButton_Click" />
         </div>
-        <p class="help">Default: 1 day. Changes apply to tenders opened after the setting is saved. Existing eligibility times do not change.</p>
+        <p class="help">Set and save a delay from 0 to 365 days before bid opening is enabled. Changes apply to tenders opened after the setting is saved. Existing eligibility times do not change.</p>
     </asp:Panel>
 </asp:Content>

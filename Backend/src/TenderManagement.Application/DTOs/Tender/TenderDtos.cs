@@ -19,6 +19,9 @@ namespace TenderManagement.Application.DTOs.Tender
         [Required, StringLength(50)]
         public string TenderType { get; set; } = string.Empty;
 
+        [Required, StringLength(50)]
+        public string TenderCategory { get; set; } = string.Empty;
+
         public DateTime? SubmissionStartDate { get; set; }
 
         public DateTime? SubmissionDeadline { get; set; }
@@ -38,6 +41,9 @@ namespace TenderManagement.Application.DTOs.Tender
         [Required, StringLength(50)]
         public string TenderType { get; set; } = string.Empty;
 
+        [Required, StringLength(50)]
+        public string TenderCategory { get; set; } = string.Empty;
+
         public DateTime? SubmissionDeadline { get; set; }
     }
 
@@ -49,6 +55,7 @@ namespace TenderManagement.Application.DTOs.Tender
         public string Title { get; set; } = string.Empty;
         public string DepartmentName { get; set; } = string.Empty;
         public string TenderType { get; set; } = string.Empty;
+        public string? TenderCategory { get; set; }
         public decimal EstimatedAmount { get; set; }
         public string CurrentStatus { get; set; } = string.Empty;
         public DateTime? PublicationDate { get; set; }

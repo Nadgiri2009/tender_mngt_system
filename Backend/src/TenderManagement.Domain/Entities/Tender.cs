@@ -11,6 +11,7 @@ namespace TenderManagement.Domain.Entities
         public int DepartmentId { get; set; }
         public decimal EstimatedAmount { get; set; }
         public string TenderType { get; set; } = string.Empty;
+        public string? TenderCategoryName { get; set; }
         public string CurrentStatus { get; set; } = Enums.TenderStatus.Draft;
         public DateTime? SubmissionStartDate { get; set; }
         public DateTime? SubmissionDeadline { get; set; }
@@ -21,6 +22,7 @@ namespace TenderManagement.Domain.Entities
         public bool IsDeleted { get; set; }
 
         public Department? Department { get; set; } = null!;
+        public TenderCategoryMaster? TenderCategory { get; set; }
         public User? CreatedByUser { get; set; }
         public ICollection<Estimate> Estimates { get; set; } = new List<Estimate>();
         public ICollection<ApprovalHistory> ApprovalHistories { get; set; } = new List<ApprovalHistory>();

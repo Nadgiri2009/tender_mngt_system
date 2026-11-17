@@ -39,7 +39,8 @@ Use this single page as the operational checklist for all officer logins from te
 
 - Approve/Reject buttons are visible only for the mapped role at that status.
 - Reject from an approval stage moves tender to Rejected and requires department-led resubmission flow.
-- For existing databases, run Database/05_AlignTechnicalEvaluationWithPdf.sql once to align Technical Evaluation ownership and stage mapping with this SOP.
+- For existing databases, rehearse `SMC_TENDER_DATABASE.sql` in `Upgrade` mode on a verified
+  restored copy; do not apply individual historical migration scripts.
 
 ## Quick Test Accounts (from DatabaseSetup)
 ***REMOVED***

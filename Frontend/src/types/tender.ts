@@ -23,6 +23,7 @@ export interface TenderListItem {
   title: string;
   departmentName: string;
   tenderType: string;
+  tenderCategory: string | null;
   estimatedAmount: number;
   currentStatus: string;
   publicationDate: string | null;
@@ -67,6 +68,7 @@ export interface CreateTenderInput {
   departmentId: number;
   estimatedAmount: number;
   tenderType: string;
+  tenderCategory: string;
   submissionStartDate?: string;
   submissionDeadline?: string;
 }
@@ -78,6 +80,7 @@ export interface UpdateTenderInput {
   description?: string;
   estimatedAmount: number;
   tenderType: string;
+  tenderCategory: string;
   submissionStartDate?: string;
   submissionDeadline?: string;
 }

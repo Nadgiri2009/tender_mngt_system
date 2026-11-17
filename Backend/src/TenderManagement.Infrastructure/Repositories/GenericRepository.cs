@@ -16,16 +16,18 @@ namespace TenderManagement.Infrastructure.Repositories
             _dbSet = context.Set<T>();
         }
 
-        public async Task<T?> GetByIdAsync(object id) => await _dbSet.FindAsync(id);
+        public async Task<T?> GetByIdAsync(object id, CancellationToken cancellationToken = default) =>
+            await _dbSet.FindAsync(new[] { id }, cancellationToken);
 
         public async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
 
-        public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate) =>
-            await _dbSet.Where(predicate).ToListAsync();
+        public async Task<IEnumerable<T>> FindAsync(
+            Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
+            await _dbSet.Where(predicate).ToListAsync(cancellationToken);
 
-        public async Task<T> AddAsync(T entity)
+        public async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
         {
-            await _dbSet.AddAsync(entity);
+            await _dbSet.AddAsync(entity, cancellationToken);
             return entity;
         }
 
@@ -33,6 +35,7 @@ namespace TenderManagement.Infrastructure.Repositories
 
         public void Remove(T entity) => _dbSet.Remove(entity);
 
-        public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
+        public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            await _context.SaveChangesAsync(cancellationToken);
     }
 }

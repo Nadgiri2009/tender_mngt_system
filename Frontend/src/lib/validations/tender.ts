@@ -25,6 +25,11 @@ const tenderTypeSchema = z
   .min(1, "Tender type is required")
   .max(50, "Tender type must be under 50 characters");
 
+const tenderCategorySchema = z
+  .string()
+  .min(1, "Tender category is required")
+  .max(50, "Tender category must be under 50 characters");
+
 const submissionDateSchema = z.string().optional().or(z.literal(""));
 
 export const createTenderSchema = z.object({
@@ -39,6 +44,7 @@ export const createTenderSchema = z.object({
     .positive("A valid department must be selected"),
   estimatedAmount: estimatedAmountSchema,
   tenderType: tenderTypeSchema,
+  tenderCategory: tenderCategorySchema,
   submissionStartDate: submissionDateSchema,
   submissionDeadline: submissionDateSchema,
 }).superRefine((values, context) => {
@@ -62,6 +68,7 @@ export const updateTenderSchema = z.object({
   description: descriptionSchema,
   estimatedAmount: estimatedAmountSchema,
   tenderType: tenderTypeSchema,
+  tenderCategory: tenderCategorySchema,
   submissionDeadline: submissionDateSchema,
 });
 

@@ -23,26 +23,34 @@ business rule for "what status comes next") be unit-testable without a database.
 
 `WorkflowService` looks up the tender's current status, checks the caller's role against the
 allowed list, and — if permitted — calls `IUnitOfWork.ExecuteWorkflowTransitionAsync(...)`, which
-executes `sp_UpdateTenderStatus` (in `/Database/02_StoredProcedures.sql`). That stored procedure
-updates `Tender.CurrentStatus` and inserts the `ApprovalHistory` row in **one SQL transaction**, so
-the live status and the audit trail can never drift apart.
+updates `Tender.CurrentStatus` and inserts the `ApprovalHistory` row in **one SQL transaction**.
+The authoritative schema and stored-procedure definitions are in the repository-root
+`SMC_TENDER_DATABASE.sql`; do not apply historical SQL files individually.
 
-`WorkflowStages` (DB table) additionally lets Admin see/reassign which Role owns each stage without
-a code deploy — the dictionary above is what's authoritative for *status sequencing*, the table is
-what's authoritative for *who currently approves what* (read by `GetPendingApprovalsForRoleAsync`).
+`WorkflowStages` stores stage ownership while the dictionary above is authoritative for status
+sequencing. Fresh database installation leaves this table empty; stage rows must be provisioned
+through an approved process before role-specific approvals are available. Upgrade mode preserves
+existing stage assignments.
 
 ## Auth
 
-JWT bearer tokens, `BCrypt.Net-Next` password hashing. Claims include `sub` (user id), `role`
-(role name — used by `[Authorize(Roles = "...")]`), and a custom `roleId` claim (used by the
-pending-approvals/dashboard endpoints to avoid an extra DB round-trip per request).
+Sign-in uses a one-time code sent to the user's registered Indian mobile number. Codes expire
+after five minutes, are single-use, and are limited to three requests per 15 minutes and five
+verification attempts. In local Development, the randomly generated code is written to the API
+console; no fixed or reusable OTP is configured. Production and non-local requests currently return
+`503`; an SMS delivery provider is not implemented. JWT bearer tokens include `sub` (user id),
+`role` (role name — used by
+`[Authorize(Roles = "...")]`), and a custom `roleId` claim (used by the pending-approvals/dashboard
+endpoints to avoid an extra DB round-trip per request). Contractor registration still collects a
+password; that password is not used for sign-in.
 
 ## Endpoints
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/auth/login` | |
-| POST | `/api/auth/register` | |
+| POST | `/api/auth/request-otp` | Returns a generic `202`; avoids confirming whether a mobile number is registered |
+| POST | `/api/auth/login` | Verifies `{ "mobile": "...", "otp": "123456" }` |
+| POST | `/api/auth/register` | Contractor self-registration |
 | GET/POST | `/api/tenders` | paginated/search/filter on GET |
 | GET/PUT/DELETE | `/api/tenders/{id}` | PUT/DELETE only while `Draft` |
 | POST | `/api/tenders/{id}/submit` | |
@@ -80,7 +88,10 @@ from the DTOs in `TenderManagement.Application/DTOs`.
 
 ## Configuration
 
-For local development, configure the API to use Windows Authentication with the SQL Express
+For local development, install a fresh database using the repository-root
+`SMC_TENDER_DATABASE.sql` with `InstallMode=Fresh`, or rehearse an approved existing database
+upgrade using `InstallMode=Upgrade` only on a verified restored copy. Never run Fresh mode against
+a populated database. Configure the API to use Windows Authentication with the SQL Express
 instance `localhost\SQLEXPRESS02` and database `TenderManagementDB`. The API process must run as a
 Windows account that has access to that database. Store configuration in .NET user-secrets rather
 than committing local credentials:

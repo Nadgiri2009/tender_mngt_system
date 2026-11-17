@@ -138,9 +138,10 @@ namespace DepartmentModule.Pages
         private void BindOverviewTables(SqlConnection connection)
         {
             using (SqlCommand command = new SqlCommand(
-                @"SELECT t.TenderType AS Category,COUNT(*) AS TenderCount
+                @"SELECT COALESCE(t.TenderCategory,N'Uncategorized') AS Category,COUNT(*) AS TenderCount
                   FROM dbo.Tender t WHERE t.IsDeleted=0
-                  GROUP BY t.TenderType ORDER BY TenderCount DESC,t.TenderType;", connection))
+                  GROUP BY COALESCE(t.TenderCategory,N'Uncategorized')
+                  ORDER BY TenderCount DESC,Category;", connection))
             using (SqlDataAdapter adapter = new SqlDataAdapter(command))
             {
                 DataTable data = new DataTable();
@@ -150,7 +151,8 @@ namespace DepartmentModule.Pages
             }
 
             using (SqlCommand command = new SqlCommand(
-                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,d.DepartmentName,
+                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,
+                         COALESCE(t.TenderCategory,N'Uncategorized') AS TenderCategory,d.DepartmentName,
                          COALESCE(u.FullName,N'') AS AssignedOfficer,
                          (SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
                           WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
@@ -167,7 +169,8 @@ namespace DepartmentModule.Pages
             }
 
             using (SqlCommand command = new SqlCommand(
-                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,d.DepartmentName,
+                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,
+                         COALESCE(t.TenderCategory,N'Uncategorized') AS TenderCategory,d.DepartmentName,
                          COALESCE(u.FullName,N'') AS AssignedOfficer,
                          t.SubmissionStartDate,t.SubmissionDeadline,t.CurrentStatus
                   FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId

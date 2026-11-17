@@ -4,6 +4,8 @@ namespace TenderManagement.Application.Interfaces
     public interface IUnitOfWork : IDisposable
     {
         ITenderRepository Tenders { get; }
+        IGenericRepository<Domain.Entities.TenderMethod> TenderMethods { get; }
+        IGenericRepository<Domain.Entities.TenderCategoryMaster> TenderCategories { get; }
         IGenericRepository<Domain.Entities.User> Users { get; }
         IGenericRepository<Domain.Entities.Role> Roles { get; }
         IGenericRepository<Domain.Entities.Department> Departments { get; }
@@ -25,7 +27,7 @@ namespace TenderManagement.Application.Interfaces
         IGenericRepository<Domain.Entities.WorkflowStage> WorkflowStages { get; }
         IGenericRepository<Domain.Entities.Announcement> Announcements { get; }
 
-        Task<int> CompleteAsync();
+        Task<int> CompleteAsync(CancellationToken cancellationToken = default);
         Task ExecuteWorkflowTransitionAsync(int tenderId, string approvalStage, string newStatus,
             string actionStatus, int approvedBy, string? roleAtAction, string? remarks);
     }

@@ -14,6 +14,8 @@ namespace TenderManagement.Infrastructure.Repositories
         {
             _context = context;
             Tenders = new TenderRepository(context);
+            TenderMethods = new GenericRepository<TenderMethod>(context);
+            TenderCategories = new GenericRepository<TenderCategoryMaster>(context);
             Users = new GenericRepository<User>(context);
             Roles = new GenericRepository<Role>(context);
             Departments = new GenericRepository<Department>(context);
@@ -37,6 +39,8 @@ namespace TenderManagement.Infrastructure.Repositories
         }
 
         public ITenderRepository Tenders { get; }
+        public IGenericRepository<TenderMethod> TenderMethods { get; }
+        public IGenericRepository<TenderCategoryMaster> TenderCategories { get; }
         public IGenericRepository<User> Users { get; }
         public IGenericRepository<Role> Roles { get; }
         public IGenericRepository<Department> Departments { get; }
@@ -58,7 +62,8 @@ namespace TenderManagement.Infrastructure.Repositories
         public IGenericRepository<WorkflowStage> WorkflowStages { get; }
         public IGenericRepository<Announcement> Announcements { get; }
 
-        public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();
+        public async Task<int> CompleteAsync(CancellationToken cancellationToken = default) =>
+            await _context.SaveChangesAsync(cancellationToken);
 
         /// <summary>
         /// Executes the workflow transition through the SQL stored procedure sp_UpdateTenderStatus,

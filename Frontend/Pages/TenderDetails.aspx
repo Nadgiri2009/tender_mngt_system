@@ -6,6 +6,7 @@
             <div class="muted"><asp:Literal ID="TenderNumber" runat="server" /> · <asp:Literal ID="DepartmentName" runat="server" /></div></div>
         <div class="row">
             <asp:HyperLink ID="ApplyTenderLink" runat="server" CssClass="button" Visible="false">Apply for this tender</asp:HyperLink>
+            <asp:HyperLink ID="FinalWorkflowLink" runat="server" NavigateUrl="~/Pages/TenderWorkflow.aspx" CssClass="button secondary" Visible="false">Open finalized workflow</asp:HyperLink>
             <asp:HyperLink ID="EditTenderLink" runat="server" CssClass="button secondary" Visible="false">Edit draft</asp:HyperLink>
             <asp:Button ID="DeleteTenderButton" runat="server" Text="Delete draft" CssClass="button danger" Visible="false"
                 OnClick="DeleteTenderButton_Click" OnClientClick="return confirm('Delete this draft tender? This action cannot be undone.');" />
@@ -18,7 +19,8 @@
         <h2>Details</h2>
         <p><strong>Description</strong><br /><asp:Literal ID="Description" runat="server" /></p>
         <div class="row">
-            <p><strong>Tender Type</strong><br /><asp:Literal ID="TenderType" runat="server" /></p>
+            <p><strong>Tender Method</strong><br /><asp:Literal ID="TenderType" runat="server" /></p>
+            <p><strong>Tender Category</strong><br /><asp:Literal ID="TenderCategory" runat="server" /></p>
             <p><strong>Estimated Cost</strong><br />₹<asp:Literal ID="EstimatedAmount" runat="server" /></p>
             <p><strong>Publication Date</strong><br /><asp:Literal ID="PublicationDate" runat="server" /></p>
             <p><strong>Approved publication period (IST)</strong><br /><asp:Literal ID="PublicationPeriod" runat="server" /></p>
@@ -70,8 +72,12 @@
         </asp:GridView></div>
         <asp:Panel ID="UploadPanel" runat="server" CssClass="card">
             <h3>Upload attachment</h3>
-            <div class="row"><div class="field"><asp:FileUpload ID="DocumentFile" runat="server" /></div><asp:Button ID="UploadButton" runat="server" Text="Upload" OnClick="UploadButton_Click" /></div>
-            <span class="help">PDF, Office documents, JPEG, or PNG; maximum 20 MB.</span>
+            <div class="row">
+                <div class="field"><label for="DocumentTypeSelect">Document type</label><asp:DropDownList ID="DocumentTypeSelect" runat="server" /></div>
+                <div class="field"><asp:FileUpload ID="DocumentFile" runat="server" /></div>
+                <asp:Button ID="UploadButton" runat="server" Text="Upload" OnClick="UploadButton_Click" />
+            </div>
+            <span class="help">Select a document type. PDF, Office documents, JPEG, or PNG; maximum 20 MB.</span>
         </asp:Panel>
     </section>
     <asp:Panel ID="AuthenticatedWorkflowPanel" runat="server">

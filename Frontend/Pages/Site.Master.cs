@@ -11,8 +11,8 @@ namespace DepartmentModule.Pages
     {
         protected HtmlGenericControl AppLayout, AdminSidebar, PublicNavigation;
         protected HyperLink AdminDashboardLink, AdminUsersLink, AdminTendersLink, AdminCreateTenderLink,
-            ApprovalsLink, TenderLifecycleLink, TenderEvaluationLink, AdminDepartmentsLink, AdminAnnouncementsLink,
-            AdminReportsLink, AdminAuditLink, DashboardLink, PublicApprovalsLink, PublicTenderLifecycleLink,
+            ApprovalsLink, AdminWorkflowLink, TenderLifecycleLink, TenderEvaluationLink, AdminRolesLink, AdminMasterDataLink, AdminDepartmentsLink, AdminAnnouncementsLink,
+            AdminReportsLink, AdminAuditLink, DashboardLink, PublicApprovalsLink, PublicWorkflowLink, PublicTenderLifecycleLink,
             PublicTenderEvaluationLink, PublicAdminLink, LoginLink, RegisterLink;
         protected Literal CurrentUser, PublicCurrentUser;
         protected LinkButton SignOutLink, PublicSignOutLink;
@@ -27,7 +27,8 @@ namespace DepartmentModule.Pages
             bool isLoginPage = String.Equals(Request.AppRelativeCurrentExecutionFilePath,
                 "~/Pages/Login.aspx", StringComparison.OrdinalIgnoreCase);
             string path = Request.AppRelativeCurrentExecutionFilePath;
-            bool isAdmin = String.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+            bool isAdmin = String.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(role, "Super Admin", StringComparison.OrdinalIgnoreCase);
             bool isAdminWorkspace = signedIn && isAdmin &&
                 (path.StartsWith("~/Pages/Admin", StringComparison.OrdinalIgnoreCase) ||
                  String.Equals(path, "~/Pages/Approvals.aspx", StringComparison.OrdinalIgnoreCase) ||
@@ -36,7 +37,8 @@ namespace DepartmentModule.Pages
                  String.Equals(path, "~/Pages/Bids.aspx", StringComparison.OrdinalIgnoreCase) ||
                  String.Equals(path, "~/Pages/WorkManagement.aspx", StringComparison.OrdinalIgnoreCase) ||
                  String.Equals(path, "~/Pages/TenderLifecycle.aspx", StringComparison.OrdinalIgnoreCase) ||
-                 String.Equals(path, "~/Pages/TenderEvaluation.aspx", StringComparison.OrdinalIgnoreCase));
+                 String.Equals(path, "~/Pages/TenderEvaluation.aspx", StringComparison.OrdinalIgnoreCase) ||
+                 String.Equals(path, "~/Pages/TenderWorkflow.aspx", StringComparison.OrdinalIgnoreCase));
 
             AppLayout.Attributes["class"] = isAdminWorkspace
                 ? "app-shell admin-layout"
@@ -45,9 +47,12 @@ namespace DepartmentModule.Pages
             PublicNavigation.Visible = !isAdminWorkspace;
             AdminDashboardLink.Visible = isAdminWorkspace;
             AdminUsersLink.Visible = isAdminWorkspace;
+            AdminRolesLink.Visible = isAdminWorkspace;
+            AdminMasterDataLink.Visible = isAdminWorkspace;
             AdminTendersLink.Visible = isAdminWorkspace;
             AdminCreateTenderLink.Visible = isAdminWorkspace;
             ApprovalsLink.Visible = isAdminWorkspace;
+            AdminWorkflowLink.Visible = isAdminWorkspace;
             TenderLifecycleLink.Visible = isAdminWorkspace;
             TenderEvaluationLink.Visible = isAdminWorkspace;
             AdminDepartmentsLink.Visible = isAdminWorkspace;
@@ -56,6 +61,9 @@ namespace DepartmentModule.Pages
             AdminAuditLink.Visible = isAdminWorkspace;
             DashboardLink.Visible = signedIn && !isAdminWorkspace;
             PublicApprovalsLink.Visible = signedIn && !isAdminWorkspace;
+            PublicWorkflowLink.Visible = signedIn && !isAdminWorkspace &&
+                HasRole(role, "Junior Engineer (JE)", "Nivida Kaksh (Tender Cell)",
+                    "Nivida Samiti Adhyaksha", "Chief Auditor", "Contractor / Vendor");
             PublicTenderLifecycleLink.Visible = signedIn && !isAdminWorkspace &&
                 HasRole(role, "DepartmentOfficer", "CAFOOfficer", "Admin");
             PublicTenderEvaluationLink.Visible = signedIn && !isAdminWorkspace &&
@@ -86,11 +94,23 @@ namespace DepartmentModule.Pages
             AdminUsersLink.CssClass = String.Equals(path, "~/Pages/AdminUsers.aspx", StringComparison.OrdinalIgnoreCase)
                 ? "is-current"
                 : String.Empty;
+            AdminRolesLink.CssClass = String.Equals(path, "~/Pages/AdminRoles.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
+            AdminMasterDataLink.CssClass = String.Equals(path, "~/Pages/AdminMasterData.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
             AdminTendersLink.CssClass = isTenderManagement ? "is-current" : String.Empty;
             AdminCreateTenderLink.CssClass = String.Equals(path, "~/Pages/TenderForm.aspx", StringComparison.OrdinalIgnoreCase)
                 ? "is-current"
                 : String.Empty;
             ApprovalsLink.CssClass = String.Equals(path, "~/Pages/Approvals.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
+            AdminWorkflowLink.CssClass = String.Equals(path, "~/Pages/TenderWorkflow.aspx", StringComparison.OrdinalIgnoreCase)
+                ? "is-current"
+                : String.Empty;
+            PublicWorkflowLink.CssClass = String.Equals(path, "~/Pages/TenderWorkflow.aspx", StringComparison.OrdinalIgnoreCase)
                 ? "is-current"
                 : String.Empty;
             TenderLifecycleLink.CssClass = String.Equals(path, "~/Pages/TenderLifecycle.aspx", StringComparison.OrdinalIgnoreCase)

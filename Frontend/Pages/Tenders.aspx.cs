@@ -33,7 +33,8 @@ namespace DepartmentModule.Pages
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            NewTenderLink.Visible = HasAnyRole("DepartmentOfficer", "Admin");
+            NewTenderLink.Visible = HasPermission("tender.create.department") ||
+                HasPermission("tenders.manage.all") || HasAnyRole("DepartmentOfficer", "Admin");
             if (!IsPostBack)
             {
                 LoadFilters();
@@ -55,12 +56,17 @@ namespace DepartmentModule.Pages
             using (SqlConnection connection = ModuleDb.OpenConnection())
             {
                 using (SqlCommand command = new SqlCommand(
-                    "SELECT DISTINCT TenderType FROM dbo.Tender WHERE IsDeleted=0 ORDER BY TenderType;", connection))
+                    @"SELECT DISTINCT COALESCE(TenderCategory,N'Uncategorized') AS TenderCategory
+                      FROM dbo.Tender WHERE IsDeleted=0 ORDER BY TenderCategory;", connection))
                 using (SqlDataReader reader = command.ExecuteReader())
                 {
                     CategoryFilter.Items.Clear();
                     CategoryFilter.Items.Add(new ListItem("All categories", ""));
-                    while (reader.Read()) CategoryFilter.Items.Add(new ListItem(reader.GetString(0), reader.GetString(0)));
+                    while (reader.Read())
+                    {
+                        string category = reader.GetString(0);
+                        CategoryFilter.Items.Add(new ListItem(category, category));
+                    }
                 }
 
                 using (SqlCommand command = new SqlCommand("SELECT DepartmentId, DepartmentName FROM dbo.Departments WHERE IsActive=1 ORDER BY DepartmentName;", connection))
@@ -89,6 +95,16 @@ namespace DepartmentModule.Pages
             string orderDirection = SortDescending ? "DESC" : "ASC";
             int page = TenderGrid.PageIndex + 1;
             string ownerFilter = HasAnyRole("DepartmentOfficer") ? " AND t.CreatedBy=@CurrentUserId" : String.Empty;
+            string workflowScope = String.Empty;
+            if (!HasPermission("system.admin") && HasAnyRole("Junior Engineer (JE)"))
+                workflowScope = " AND @AuthorizedDepartmentId IS NOT NULL AND t.DepartmentId=@AuthorizedDepartmentId";
+            else if (!HasPermission("system.admin") &&
+                HasAnyRole("Nivida Kaksh (Tender Cell)", "Nivida Samiti Adhyaksha", "Chief Auditor"))
+                workflowScope = @" AND t.WorkflowVersion=2 AND EXISTS
+                                   (SELECT 1 FROM dbo.TenderWorkflowAssignments scopeAssignment
+                                    WHERE scopeAssignment.TenderId=t.TenderId AND scopeAssignment.IsCurrent=1
+                                      AND scopeAssignment.AssignedRoleId=@WorkflowRoleId
+                                      AND (scopeAssignment.AssignedUserId IS NULL OR scopeAssignment.AssignedUserId=@WorkflowUserId))";
             string statusBucket = TenderStatusBuckets.Predicate(StatusFilter.SelectedValue);
             object dateFrom;
             object dateTo;
@@ -106,10 +122,11 @@ namespace DepartmentModule.Pages
                                AND (@Status=N'' OR t.CurrentStatus=@Status" +
                                (statusBucket == null ? String.Empty : " OR (" + statusBucket + ")") +
                                @")
-                               AND (@Category=N'' OR t.TenderType=@Category)
+                               AND (@Category=N'' OR (@Category=N'Uncategorized' AND t.TenderCategory IS NULL)
+                                    OR t.TenderCategory=@Category)
                                AND (@DateFrom IS NULL OR COALESCE(s.CurrentClosingUtc,t.SubmissionDeadline)>=@DateFrom)
                                AND (@DateTo IS NULL OR COALESCE(s.CurrentClosingUtc,t.SubmissionDeadline)<DATEADD(DAY,1,@DateTo))
-                               AND (@DepartmentId=0 OR t.DepartmentId=@DepartmentId)" + ownerFilter;
+                               AND (@DepartmentId=0 OR t.DepartmentId=@DepartmentId)" + ownerFilter + workflowScope;
             try
             {
                 using (SqlConnection connection = ModuleDb.OpenConnection())
@@ -119,15 +136,18 @@ namespace DepartmentModule.Pages
                     {
                         AddFilterParameters(countCommand, dateFrom, dateTo);
                         AddOwnerParameter(countCommand);
+                        AddWorkflowScopeParameters(countCommand);
                         count = Convert.ToInt32(countCommand.ExecuteScalar());
                     }
                     int pages = Math.Max(1, (int)Math.Ceiling(count / 10.0));
                     if (page > pages) { TenderGrid.PageIndex = pages - 1; page = pages; }
                     using (SqlCommand listCommand = new SqlCommand(
-                        @"SELECT t.TenderId,t.TenderNumber,t.Title,t.TenderType,d.DepartmentName,
+                        @"SELECT t.TenderId,t.TenderNumber,t.Title,t.TenderType,
+                                 COALESCE(t.TenderCategory,N'Uncategorized') AS TenderCategory,d.DepartmentName,
                                  COALESCE(u.FullName,N'') AS AssignedOfficer,t.EstimatedAmount,
-                                 (SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
-                                  WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
+                                 COALESCE((SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
+                                           WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published'),
+                                          s.PublicationStartUtc) AS PublicationDate,
                                  COALESCE(s.PublicationStartUtc,t.SubmissionStartDate) AS SubmissionStartDate,
                                  COALESCE(s.CurrentClosingUtc,t.SubmissionDeadline) AS SubmissionDeadline,
                                  t.CurrentStatus,t.CreatedDate " + filter +
@@ -135,6 +155,7 @@ namespace DepartmentModule.Pages
                     {
                         AddFilterParameters(listCommand, dateFrom, dateTo);
                         AddOwnerParameter(listCommand);
+                        AddWorkflowScopeParameters(listCommand);
                         ModuleDb.AddParameter(listCommand, "@Offset", SqlDbType.Int, (page - 1) * 10);
                         using (SqlDataAdapter adapter = new SqlDataAdapter(listCommand))
                         {
@@ -204,6 +225,19 @@ namespace DepartmentModule.Pages
         {
             if (HasAnyRole("DepartmentOfficer"))
                 ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
+        }
+
+        private void AddWorkflowScopeParameters(SqlCommand command)
+        {
+            if (!HasPermission("system.admin") && HasAnyRole("Junior Engineer (JE)"))
+                ModuleDb.AddParameter(command, "@AuthorizedDepartmentId", SqlDbType.Int,
+                    CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+            else if (!HasPermission("system.admin") &&
+                HasAnyRole("Nivida Kaksh (Tender Cell)", "Nivida Samiti Adhyaksha", "Chief Auditor"))
+            {
+                ModuleDb.AddParameter(command, "@WorkflowRoleId", SqlDbType.Int, CurrentRoleId);
+                ModuleDb.AddParameter(command, "@WorkflowUserId", SqlDbType.Int, CurrentUserId);
+            }
         }
 
         protected void FilterButton_Click(object sender, EventArgs e)

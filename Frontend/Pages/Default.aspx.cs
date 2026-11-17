@@ -10,24 +10,117 @@ namespace DepartmentModule.Pages
     {
         protected Literal Message, TotalTenders, ApprovedTenders, PendingCount, RejectedTenders, UnderReviewTenders, RecentHeading,
             LifecyclePendingApprovals, LifecycleAwaitingPublication, LifecyclePublished, LifecycleExtensions,
-            LifecycleBidOpenings, LifecycleAwaitingEvaluation, LifecycleUnderEvaluation;
-        protected HyperLink NewTenderLink;
-        protected Panel PendingApprovalsPanel, LifecycleSummaryPanel;
+            LifecycleBidOpenings, LifecycleAwaitingEvaluation, LifecycleUnderEvaluation,
+            FinalQueueCount, FinalVerificationCount, FinalShortfallCount, FinalApprovalCount;
+        protected HyperLink NewTenderLink, WorkflowQueueLink;
+        protected Panel PendingApprovalsPanel, LifecycleSummaryPanel, LegacyDashboardPanel, FinalWorkflowDashboardPanel;
         protected System.Web.UI.WebControls.PlaceHolder LifecycleReviewSummaryPanel;
-        protected GridView PendingGrid, RecentGrid, CategoryStatsGrid, UpcomingGrid;
+        protected GridView PendingGrid, RecentGrid, CategoryStatsGrid, UpcomingGrid, FinalWorkflowGrid;
 
         protected void Page_Load(object sender, EventArgs e)
         {
             if (!IsPostBack)
             {
+                bool isFinalWorkflowRole = HasAnyRole("Junior Engineer (JE)", "Nivida Kaksh (Tender Cell)",
+                    "Nivida Samiti Adhyaksha", "Chief Auditor", "Contractor");
+                LegacyDashboardPanel.Visible = !isFinalWorkflowRole;
+                FinalWorkflowDashboardPanel.Visible = isFinalWorkflowRole;
                 bool isRespOfficer = HasAnyRole("DepartmentOfficer");
-                NewTenderLink.Visible = HasAnyRole("DepartmentOfficer", "Admin");
+                NewTenderLink.Visible = HasPermission("tender.create.department") ||
+                    HasPermission("tenders.manage.all") || HasAnyRole("DepartmentOfficer", "Admin");
+                WorkflowQueueLink.Visible = HasPermission("tender.create.department") ||
+                    HasPermission("tender.publication.manage") || HasPermission("tender.primary.open") ||
+                    HasPermission("tender.primary.verify") || HasPermission("tender.cell.verify") ||
+                    HasPermission("shortfall.create") || HasPermission("shortfall.approve") ||
+                    HasPermission("shortfall.respond.own") || HasPermission("shortfall.clear") ||
+                    HasPermission("financial.open.approve") || HasPermission("financial.open.execute") ||
+                    HasPermission("financial.approve.final") || HasPermission("workorder.manage") ||
+                    HasPermission("agreement.manage");
+                if (isFinalWorkflowRole)
+                {
+                    LoadFinalWorkflowDashboard();
+                    return;
+                }
                 PendingApprovalsPanel.Visible = !isRespOfficer;
                 LifecycleSummaryPanel.Visible = !HasAnyRole("Contractor");
                 LifecycleReviewSummaryPanel.Visible = HasAnyRole("CAFOOfficer", "TenderSection", "TenderCommittee", "Admin");
                 RecentHeading.Text = isRespOfficer ? "My recent tenders" : "Recently updated tenders";
                 LoadDashboard();
             }
+        }
+
+        private void LoadFinalWorkflowDashboard()
+        {
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                {
+                    using (SqlCommand command = new SqlCommand(
+                        @"SELECT COUNT(*) AS AssignedCount,
+                                 SUM(CASE WHEN s.StageName IN
+                                     (N'Final_JE_OpenTechnicalBids',N'Final_JE_CompletePrimaryVerification',
+                                      N'Final_Cell_CompleteSecondaryVerification',N'Final_Cell_ClearShortfall')
+                                     THEN 1 ELSE 0 END) AS VerificationCount,
+                                 SUM(CASE WHEN s.StageName IN
+                                     (N'Final_Cell_CreateShortfall',N'Final_JE_ApproveShortfall',
+                                      N'Final_Contractor_SubmitShortfall',N'Final_Cell_ClearShortfall')
+                                     THEN 1 ELSE 0 END) AS ShortfallCount,
+                                 SUM(CASE WHEN s.StageName IN
+                                     (N'Final_Samiti_ApproveFinancialOpening',N'Final_Auditor_ApproveFinancialBids')
+                                     THEN 1 ELSE 0 END) AS ApprovalCount
+                          FROM dbo.TenderWorkflowAssignments a
+                          INNER JOIN dbo.Tender t ON t.TenderId=a.TenderId AND t.WorkflowVersion=2 AND t.IsDeleted=0
+                          INNER JOIN dbo.WorkflowStages s ON s.StageId=a.StageId AND s.WorkflowVersion=2
+                          WHERE a.IsCurrent=1 AND a.AssignedRoleId=@RoleId
+                            AND ((@IsContractor=1 AND a.AssignedUserId=@UserId)
+                                 OR (@IsContractor=0 AND (a.AssignedUserId IS NULL OR a.AssignedUserId=@UserId)
+                                     AND (@DepartmentId IS NULL OR a.DepartmentId=@DepartmentId)));",
+                        connection))
+                    {
+                        AddFinalWorkflowScope(command);
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                FinalQueueCount.Text = Convert.ToString(reader["AssignedCount"] == DBNull.Value ? 0 : reader["AssignedCount"]);
+                                FinalVerificationCount.Text = Convert.ToString(reader["VerificationCount"] == DBNull.Value ? 0 : reader["VerificationCount"]);
+                                FinalShortfallCount.Text = Convert.ToString(reader["ShortfallCount"] == DBNull.Value ? 0 : reader["ShortfallCount"]);
+                                FinalApprovalCount.Text = Convert.ToString(reader["ApprovalCount"] == DBNull.Value ? 0 : reader["ApprovalCount"]);
+                            }
+                        }
+                    }
+                    using (SqlCommand command = new SqlCommand(
+                        @"SELECT t.TenderId,t.TenderNumber,t.Title,d.DepartmentName,s.StageName,t.CurrentStatus
+                          FROM dbo.TenderWorkflowAssignments a
+                          INNER JOIN dbo.Tender t ON t.TenderId=a.TenderId AND t.WorkflowVersion=2 AND t.IsDeleted=0
+                          INNER JOIN dbo.WorkflowStages s ON s.StageId=a.StageId AND s.WorkflowVersion=2
+                          INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId
+                          WHERE a.IsCurrent=1 AND a.AssignedRoleId=@RoleId
+                            AND ((@IsContractor=1 AND a.AssignedUserId=@UserId)
+                                 OR (@IsContractor=0 AND (a.AssignedUserId IS NULL OR a.AssignedUserId=@UserId)
+                                     AND (@DepartmentId IS NULL OR a.DepartmentId=@DepartmentId)))
+                          ORDER BY a.AssignedAtUtc,t.TenderId;", connection))
+                    {
+                        AddFinalWorkflowScope(command);
+                        FinalWorkflowGrid.DataSource = ReadTable(command);
+                        FinalWorkflowGrid.DataBind();
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Finalized workflow dashboard could not be loaded.", ex);
+                Message.Text = "<div class=\"message\">Your workflow dashboard could not be loaded. Please retry or contact support.</div>";
+            }
+        }
+
+        private void AddFinalWorkflowScope(SqlCommand command)
+        {
+            ModuleDb.AddParameter(command, "@RoleId", SqlDbType.Int, CurrentRoleId);
+            ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+            ModuleDb.AddParameter(command, "@IsContractor", SqlDbType.Bit, HasAnyRole("Contractor"));
+            ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
         }
 
         private void LoadDashboard()
@@ -150,7 +243,8 @@ namespace DepartmentModule.Pages
         private void BindDashboardTables(SqlConnection connection, bool isRespOfficer, string ownerFilter)
         {
             using (SqlCommand command = new SqlCommand(
-                @"SELECT TOP (5) t.TenderId, t.TenderNumber, t.Title, t.TenderType, d.DepartmentName,
+                @"SELECT TOP (5) t.TenderId, t.TenderNumber, t.Title, t.TenderType,
+                         COALESCE(t.TenderCategory,N'Uncategorized') AS TenderCategory,d.DepartmentName,
                          COALESCE(u.FullName,N'') AS AssignedOfficer,
                          (SELECT MIN(ah.ApprovalDate) FROM dbo.ApprovalHistory ah
                           WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
@@ -166,9 +260,9 @@ namespace DepartmentModule.Pages
             }
 
             using (SqlCommand command = new SqlCommand(
-                @"SELECT t.TenderType AS Category,COUNT(*) AS TenderCount
+                @"SELECT COALESCE(t.TenderCategory,N'Uncategorized') AS Category,COUNT(*) AS TenderCount
                   FROM dbo.Tender t WHERE t.IsDeleted=0" + ownerFilter +
-                " GROUP BY t.TenderType ORDER BY TenderCount DESC,t.TenderType;", connection))
+                " GROUP BY COALESCE(t.TenderCategory,N'Uncategorized') ORDER BY TenderCount DESC,Category;", connection))
             {
                 if (isRespOfficer)
                     ModuleDb.AddParameter(command, "@CurrentUserId", SqlDbType.Int, CurrentUserId);
@@ -177,7 +271,8 @@ namespace DepartmentModule.Pages
             }
 
             using (SqlCommand command = new SqlCommand(
-                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,t.SubmissionStartDate,t.SubmissionDeadline,
+                @"SELECT TOP (5) t.TenderId,t.TenderNumber,t.Title,t.TenderType,
+                         COALESCE(t.TenderCategory,N'Uncategorized') AS TenderCategory,t.SubmissionStartDate,t.SubmissionDeadline,
                          COALESCE(u.FullName,N'') AS AssignedOfficer,
                          d.DepartmentName,t.CurrentStatus
                   FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId

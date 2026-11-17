@@ -40,7 +40,8 @@ This handout mirrors the final approved PDF workflow and the implemented system 
 Notes (Hindi):
 - Approve/Reject बटन केवल उसी रोल को दिखते हैं जिसे उस स्टेज के लिए मैप किया गया है।
 - Rejected होने पर विभागीय प्रक्रिया के अनुसार दोबारा आगे बढ़ाना होगा।
-- Existing DB के लिए एक बार Database/05_AlignTechnicalEvaluationWithPdf.sql चलाएं।
+- Existing DB के लिए पहले verified backup की isolated copy पर `SMC_TENDER_DATABASE.sql` का
+  `Upgrade` mode rehearse करें; historical migration scripts अलग-अलग न चलाएं।
 
 ## मराठी (Marathi) - अधिकारी स्टेप फ्लो
 
@@ -80,4 +81,5 @@ Notes (Hindi):
 Notes (Marathi):
 - Approve/Reject बटणे फक्त त्या स्टेजसाठी मॅप केलेल्या भूमिकेलाच दिसतात.
 - Rejected झाल्यास विभागीय प्रक्रियेनुसार पुन्हा सबमिट करावे लागेल.
-- Existing DB साठी एकदा Database/05_AlignTechnicalEvaluationWithPdf.sql चालवा.
+- Existing DB साठी आधी verified backup च्या isolated copy वर `SMC_TENDER_DATABASE.sql` चा
+  `Upgrade` mode तपासा; historical migration scripts वेगवेगळे चालवू नका.

@@ -12,6 +12,8 @@ namespace TenderManagement.Infrastructure.Data
         public DbSet<User> Users => Set<User>();
         public DbSet<Contractor> Contractors => Set<Contractor>();
         public DbSet<Tender> Tenders => Set<Tender>();
+        public DbSet<TenderMethod> TenderMethods => Set<TenderMethod>();
+        public DbSet<TenderCategoryMaster> TenderCategories => Set<TenderCategoryMaster>();
         public DbSet<Estimate> Estimates => Set<Estimate>();
         public DbSet<ApprovalHistory> ApprovalHistories => Set<ApprovalHistory>();
         public DbSet<TenderDocument> TenderDocuments => Set<TenderDocument>();
@@ -75,10 +77,27 @@ namespace TenderManagement.Infrastructure.Data
                 e.Property(x => x.TenderNumber).IsRequired().HasMaxLength(50);
                 e.HasIndex(x => x.TenderNumber).IsUnique();
                 e.Property(x => x.EstimatedAmount).HasColumnType("decimal(18,2)");
+                e.Property(x => x.TenderCategoryName).HasColumnName("TenderCategory").HasMaxLength(50);
                 e.HasOne(x => x.Department).WithMany(d => d.Tenders).HasForeignKey(x => x.DepartmentId);
+                e.HasOne(x => x.TenderCategory).WithMany().HasForeignKey(x => x.TenderCategoryName)
+                    .HasPrincipalKey(x => x.TypeName).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
                 e.HasQueryFilter(x => !x.IsDeleted);
                    e.Property(x => x.TrackingId).HasMaxLength(100).IsRequired();
+            });
+
+            modelBuilder.Entity<TenderMethod>(e =>
+            {
+                e.ToTable("TenderMethods");
+                e.HasKey(x => x.MethodName);
+                e.Property(x => x.MethodName).HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<TenderCategoryMaster>(e =>
+            {
+                e.ToTable("TenderTypes");
+                e.HasKey(x => x.TypeName);
+                e.Property(x => x.TypeName).HasMaxLength(50);
             });
 
             modelBuilder.Entity<Estimate>(e =>

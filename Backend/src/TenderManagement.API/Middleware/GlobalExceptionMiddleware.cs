@@ -41,6 +41,8 @@ namespace TenderManagement.API.Middleware
                 BusinessRuleException => (HttpStatusCode.BadRequest, ex.Message),
                 ForbiddenActionException => (HttpStatusCode.Forbidden, ex.Message),
                 UnauthorizedAccessException => (HttpStatusCode.Unauthorized, ex.Message),
+                OtpDeliveryUnavailableException => (HttpStatusCode.ServiceUnavailable,
+                    "One-time code delivery is not configured for this environment."),
                 _ => (HttpStatusCode.InternalServerError, "An unexpected error occurred. Please try again later.")
             };
 

@@ -110,7 +110,7 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Tender Type</p>
-                  <p className="text-sm font-medium break-words">{tender.tenderType}</p>
+                  <p className="text-sm font-medium break-words">{tender.tenderCategory ?? "—"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Estimated Cost</p>

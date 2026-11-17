@@ -14,13 +14,18 @@ namespace DepartmentModule.Pages
         protected Literal TenderNumber, TenderTitle, Message;
         protected HtmlGenericControl TechnicalBidsSection, FinancialBidsSection;
         protected HyperLink BackLink;
-        protected GridView TechnicalGrid, FinancialGrid;
+        protected GridView TechnicalGrid, FinancialGrid, RequiredBidDocumentsGrid;
         protected Panel EvaluatePanel, SelectPanel, TechnicalSubmissionPanel, FinancialSubmissionPanel;
         protected DropDownList TechnicalBidSelect, TechnicalStatus, FinancialBidSelect, TechnicalContractorSelect, FinancialContractorSelect;
-        protected TextBox TechnicalRemarks, SelectionRemarks, TechnicalDocumentPathText, FinancialBidAmountText;
-        protected Button EvaluateButton, SelectContractorButton, SubmitTechnicalButton, SubmitFinancialButton;
+        protected TextBox TechnicalRemarks, SelectionRemarks, TechnicalDocumentPathText, FinancialBidAmountText,
+            TechnicalDocumentTypeText;
+        protected Button EvaluateButton, SelectContractorButton, SubmitTechnicalButton, SubmitFinancialButton,
+            UploadTechnicalDocumentButton;
         protected Literal ContractorProfileMessage;
         protected System.Web.UI.HtmlControls.HtmlGenericControl TechnicalContractorField, FinancialContractorField;
+        protected System.Web.UI.HtmlControls.HtmlGenericControl LegacyDocumentPathField;
+        protected FileUpload TechnicalDocumentUpload;
+        protected GridView TechnicalDocumentsGrid;
         private int TenderId { get { return QueryId("tenderId"); } }
         private bool IsReviewer { get { return HasAnyRole("TenderSection", "TenderCommittee", "CAFOOfficer", "Admin"); } }
         private bool IsContractor { get { return HasAnyRole("Contractor"); } }
@@ -46,8 +51,9 @@ namespace DepartmentModule.Pages
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 {
                     string currentStatus;
+                    int workflowVersion;
                     using (SqlCommand command = new SqlCommand(
-                        @"SELECT t.TenderNumber,t.Title,t.CurrentStatus
+                        @"SELECT t.TenderNumber,t.Title,t.CurrentStatus,t.WorkflowVersion
                           FROM dbo.Tender t
                           WHERE t.TenderId=@TenderId AND t.IsDeleted=0
                             AND (@Role=N'Admin' OR
@@ -66,8 +72,11 @@ namespace DepartmentModule.Pages
                             TenderNumber.Text = ModuleDb.Html(reader["TenderNumber"]);
                             TenderTitle.Text = ModuleDb.Html(reader["Title"]);
                             currentStatus = Convert.ToString(reader["CurrentStatus"]);
+                            workflowVersion = Convert.ToInt32(reader["WorkflowVersion"]);
+                            LegacyDocumentPathField.Visible = workflowVersion < 2;
                         }
                     }
+                    BindRequiredBidDocumentTypes(connection, workflowVersion);
                     if (!IsBidStageOrLater(currentStatus))
                     {
                         Response.Redirect("~/Pages/TenderDetails.aspx?id=" + TenderId.ToString(CultureInfo.InvariantCulture), false);
@@ -108,6 +117,7 @@ namespace DepartmentModule.Pages
                         openingComplete && String.Equals(currentStatus, "Technical Evaluation", StringComparison.OrdinalIgnoreCase);
                     SelectPanel.Visible = HasAnyRole("TenderCommittee", "Admin") && openingComplete && financialOpening;
                     ConfigureSubmissionPanels(connection, canSubmit);
+                    BindTechnicalDocuments(connection);
                 }
             }
             catch (SqlException ex)
@@ -235,6 +245,7 @@ namespace DepartmentModule.Pages
             if (!String.IsNullOrEmpty(technicalStatus))
             {
                 SubmitTechnicalButton.Enabled = false;
+                UploadTechnicalDocumentButton.Visible = canSubmit;
                 ContractorProfileMessage.Text = "<div class=\"message\">Your technical bid status is " + HttpUtility.HtmlEncode(technicalStatus) + ".</div>";
             }
 
@@ -248,6 +259,36 @@ namespace DepartmentModule.Pages
                     SubmitFinancialButton.Enabled = false;
                     ContractorProfileMessage.Text = "<div class=\"message\">Your financial bid has already been submitted.</div>";
                 }
+            }
+        }
+
+        private void BindTechnicalDocuments(SqlConnection connection)
+        {
+            string bidderScope = IsContractor ? " AND b.ContractorId=@ContractorId" : String.Empty;
+            if (!IsContractor && !(IsReviewer && IsBidOpeningRecorded(connection)))
+            {
+                TechnicalDocumentsGrid.DataSource = new DataTable();
+                TechnicalDocumentsGrid.DataBind();
+                return;
+            }
+
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT d.TechnicalBidDocumentId,d.DocumentType,d.FileName,d.UploadedDate
+                  FROM dbo.TechnicalBidDocuments d
+                  INNER JOIN dbo.TechnicalBid b ON b.TechnicalBidId=d.TechnicalBidId
+                  WHERE b.TenderId=@TenderId" + bidderScope + " ORDER BY d.UploadedDate DESC;", connection))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                if (IsContractor)
+                {
+                    int? contractorId = GetCurrentContractorId(connection);
+                    ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int,
+                        contractorId.HasValue ? (object)contractorId.Value : -1);
+                }
+                DataTable table = new DataTable();
+                using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(table);
+                TechnicalDocumentsGrid.DataSource = table;
+                TechnicalDocumentsGrid.DataBind();
             }
         }
 
@@ -302,16 +343,19 @@ namespace DepartmentModule.Pages
 
         protected void SubmitTechnicalButton_Click(object sender, EventArgs e)
         {
-            if (!HasAnyRole("Contractor", "Admin") || TechnicalDocumentPathText.Text.Trim().Length > 400)
+            if (!HasAnyRole("Contractor", "Admin") || TechnicalDocumentPathText.Text.Trim().Length > 400 ||
+                TechnicalDocumentTypeText.Text.Trim().Length > 160)
             {
-                ShowError("A contractor or administrator must submit the bid, and the document path cannot exceed 400 characters.");
+                ShowError("A contractor or administrator must submit the bid; document details are too long.");
                 return;
             }
 
+            string storedPath = null;
             try
             {
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 {
+                    int workflowVersion = GetWorkflowVersion(connection);
                     int? contractorId = ResolveSubmissionContractorId(connection, TechnicalContractorSelect);
                     if (!contractorId.HasValue)
                     {
@@ -319,19 +363,49 @@ namespace DepartmentModule.Pages
                         return;
                     }
 
+                    if (workflowVersion >= 2 &&
+                        (!TechnicalDocumentUpload.HasFile ||
+                         !IsRequiredBidDocumentType(connection, TechnicalDocumentTypeText.Text.Trim())))
+                    {
+                        ShowError("Upload a document whose type matches the tender's required bidder-document checklist.");
+                        return;
+                    }
+                    if (TechnicalDocumentUpload.HasFile &&
+                        String.IsNullOrWhiteSpace(TechnicalDocumentTypeText.Text))
+                    {
+                        ShowError("Enter the document type for the uploaded technical bid document.");
+                        return;
+                    }
+
+                    string uploadedFileName = TechnicalDocumentUpload.HasFile
+                        ? TenderLifecycleFiles.SafeFileName(TechnicalDocumentUpload.FileName)
+                        : null;
+                    if (uploadedFileName != null && uploadedFileName.Length > 260)
+                    {
+                        ShowError("The uploaded file name is too long.");
+                        return;
+                    }
+                    if (TechnicalDocumentUpload.HasFile)
+                        storedPath = TenderLifecycleFiles.SaveTenderBidUpload(this, TechnicalDocumentUpload, TenderId);
+
                     using (SqlTransaction transaction = connection.BeginTransaction())
                     {
                         EnsureBidWindowOpen(connection, transaction);
+                        int technicalBidId;
                         using (SqlCommand command = new SqlCommand(
                             @"INSERT INTO dbo.TechnicalBid (TenderId,ContractorId,DocumentPath,Status,SubmittedDate)
+                              OUTPUT INSERTED.TechnicalBidId
                               VALUES (@TenderId,@ContractorId,@DocumentPath,N'Submitted',SYSUTCDATETIME());", connection, transaction))
                         {
                             ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
                             ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId.Value);
-                            AddText(command, "@DocumentPath", SqlDbType.NVarChar, TechnicalDocumentPathText.Text, 400);
-                            command.ExecuteNonQuery();
+                            AddText(command, "@DocumentPath", SqlDbType.NVarChar,
+                                storedPath == null ? TechnicalDocumentPathText.Text : (workflowVersion >= 2 ? null : storedPath), 400);
+                            technicalBidId = Convert.ToInt32(command.ExecuteScalar());
                         }
 
+                        if (storedPath != null)
+                            InsertTechnicalBidDocument(connection, transaction, technicalBidId, uploadedFileName, storedPath);
                         transaction.Commit();
                     }
                 }
@@ -341,12 +415,155 @@ namespace DepartmentModule.Pages
             }
             catch (SqlException ex)
             {
+                if (storedPath != null) TenderLifecycleFiles.DeleteStoredBidUpload(this, storedPath);
                 Trace.Warn("DepartmentModule", "Technical bid submission failed.", ex);
                 ShowError(ex.Number == 2601 || ex.Number == 2627
                     ? "A technical bid has already been submitted for this contractor and tender."
                     : "The technical bid could not be submitted.");
             }
-            catch (InvalidOperationException ex) { ShowError(ex.Message); }
+            catch (InvalidOperationException ex)
+            {
+                if (storedPath != null) TenderLifecycleFiles.DeleteStoredBidUpload(this, storedPath);
+                ShowError(ex.Message);
+            }
+        }
+
+        protected void UploadTechnicalDocumentButton_Click(object sender, EventArgs e)
+        {
+            if (!HasAnyRole("Contractor", "Admin") || !TechnicalDocumentUpload.HasFile ||
+                String.IsNullOrWhiteSpace(TechnicalDocumentTypeText.Text) ||
+                TechnicalDocumentTypeText.Text.Trim().Length > 160)
+            {
+                ShowError("Select a technical bid document and enter its document type.");
+                return;
+            }
+
+            string storedPath = null;
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                {
+                    int? contractorId = ResolveSubmissionContractorId(connection, TechnicalContractorSelect);
+                    if (!contractorId.HasValue)
+                    {
+                        ShowError("An active contractor profile is required to upload a bid document.");
+                        return;
+                    }
+
+                    if (GetWorkflowVersion(connection) >= 2 &&
+                        !IsRequiredBidDocumentType(connection, TechnicalDocumentTypeText.Text.Trim()))
+                    {
+                        ShowError("Select a document type from the tender's required bidder-document checklist.");
+                        return;
+                    }
+
+                    EnsureBidWindowOpen(connection, null);
+                    string fileName = TenderLifecycleFiles.SafeFileName(TechnicalDocumentUpload.FileName);
+                    if (fileName.Length > 260)
+                    {
+                        ShowError("The uploaded file name is too long.");
+                        return;
+                    }
+                    storedPath = TenderLifecycleFiles.SaveTenderBidUpload(this, TechnicalDocumentUpload, TenderId);
+
+                    using (SqlTransaction transaction = connection.BeginTransaction(IsolationLevel.Serializable))
+                    {
+                        EnsureBidWindowOpen(connection, transaction);
+                        int technicalBidId;
+                        using (SqlCommand command = new SqlCommand(
+                            @"SELECT TechnicalBidId FROM dbo.TechnicalBid WITH (UPDLOCK,HOLDLOCK)
+                              WHERE TenderId=@TenderId AND ContractorId=@ContractorId AND Status=N'Submitted';",
+                            connection, transaction))
+                        {
+                            ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                            ModuleDb.AddParameter(command, "@ContractorId", SqlDbType.Int, contractorId.Value);
+                            object value = command.ExecuteScalar();
+                            if (value == null || value == DBNull.Value)
+                                throw new InvalidOperationException("Submit a technical bid before uploading additional documents.");
+                            technicalBidId = Convert.ToInt32(value);
+                        }
+
+                        InsertTechnicalBidDocument(connection, transaction, technicalBidId, fileName, storedPath);
+                        ModuleDb.AddAudit(connection, transaction, CurrentUserId, "UploadTechnicalBidDocument",
+                            "TechnicalBid", technicalBidId, TechnicalDocumentTypeText.Text.Trim(), Request.UserHostAddress);
+                        transaction.Commit();
+                    }
+                }
+
+                Message.Text = "<div class=\"message success\">Technical bid document uploaded.</div>";
+                LoadPage();
+            }
+            catch (SqlException ex)
+            {
+                if (storedPath != null) TenderLifecycleFiles.DeleteStoredBidUpload(this, storedPath);
+                Trace.Warn("DepartmentModule", "Technical bid document upload failed.", ex);
+                ShowError("The technical bid document could not be uploaded.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                if (storedPath != null) TenderLifecycleFiles.DeleteStoredBidUpload(this, storedPath);
+                ShowError(ex.Message);
+            }
+        }
+
+        private int GetWorkflowVersion(SqlConnection connection)
+        {
+            using (SqlCommand command = new SqlCommand(
+                "SELECT WorkflowVersion FROM dbo.Tender WHERE TenderId=@TenderId AND IsDeleted=0;", connection))
+            {
+                ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                object value = command.ExecuteScalar();
+                if (value == null || value == DBNull.Value)
+                    throw new InvalidOperationException("The tender is unavailable.");
+                return Convert.ToInt32(value);
+            }
+        }
+
+        private void BindRequiredBidDocumentTypes(SqlConnection connection, int workflowVersion)
+            {
+                DataTable data = new DataTable();
+                if (workflowVersion >= 2)
+                {
+                    using (SqlCommand command = new SqlCommand(
+                        @"SELECT DocumentType FROM dbo.TenderRequiredBidDocuments
+                          WHERE TenderId=@TenderId ORDER BY DocumentType;", connection))
+                    {
+                        ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(data);
+                    }
+                }
+                RequiredBidDocumentsGrid.DataSource = data;
+                RequiredBidDocumentsGrid.DataBind();
+            }
+
+        private bool IsRequiredBidDocumentType(SqlConnection connection, string documentType)
+            {
+                using (SqlCommand command = new SqlCommand(
+                    @"SELECT COUNT(1) FROM dbo.TenderRequiredBidDocuments
+                      WHERE TenderId=@TenderId AND DocumentType=@DocumentType;", connection))
+                {
+                    ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
+                    AddText(command, "@DocumentType", SqlDbType.NVarChar, documentType, 160);
+                    return Convert.ToInt32(command.ExecuteScalar()) == 1;
+                }
+            }
+
+        private void InsertTechnicalBidDocument(SqlConnection connection, SqlTransaction transaction,
+            int technicalBidId, string fileName, string filePath)
+        {
+            using (SqlCommand command = new SqlCommand(
+                @"INSERT INTO dbo.TechnicalBidDocuments
+                    (TechnicalBidId,FileName,FilePath,DocumentType,UploadedBy)
+                  VALUES(@TechnicalBidId,@FileName,@FilePath,@DocumentType,@UploadedBy);",
+                connection, transaction))
+            {
+                ModuleDb.AddParameter(command, "@TechnicalBidId", SqlDbType.Int, technicalBidId);
+                AddText(command, "@FileName", SqlDbType.NVarChar, fileName, 260);
+                AddText(command, "@FilePath", SqlDbType.NVarChar, filePath, 400);
+                AddText(command, "@DocumentType", SqlDbType.NVarChar, TechnicalDocumentTypeText.Text, 160);
+                ModuleDb.AddParameter(command, "@UploadedBy", SqlDbType.Int, CurrentUserId);
+                command.ExecuteNonQuery();
+            }
         }
 
         protected void SubmitFinancialButton_Click(object sender, EventArgs e)

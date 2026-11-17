@@ -71,6 +71,8 @@ namespace TenderManagement.Application.Services
                 throw new BusinessRuleException("Submission deadline must be after the application start date.");
             }
 
+            await ValidateTenderCatalogValuesAsync(dto.TenderType, dto.TenderCategory);
+
             var user = await _unitOfWork.Users.GetByIdAsync(currentUserId)
                 ?? throw new NotFoundException(nameof(User), currentUserId);
             var role = await _unitOfWork.Roles.GetByIdAsync(user.RoleId);
@@ -92,6 +94,7 @@ namespace TenderManagement.Application.Services
                 DepartmentId = dto.DepartmentId.Value,
                 EstimatedAmount = dto.EstimatedAmount,
                 TenderType = dto.TenderType,
+                TenderCategoryName = dto.TenderCategory,
                 SubmissionStartDate = dto.SubmissionStartDate,
                 SubmissionDeadline = dto.SubmissionDeadline,
                 CurrentStatus = TenderStatus.Draft,
@@ -118,10 +121,13 @@ namespace TenderManagement.Application.Services
                 throw new BusinessRuleException("Only tenders in Draft status can be edited.");
             }
 
+            await ValidateTenderCatalogValuesAsync(dto.TenderType, dto.TenderCategory);
+
             tender.Title = dto.Title;
             tender.Description = dto.Description;
             tender.EstimatedAmount = dto.EstimatedAmount;
             tender.TenderType = dto.TenderType;
+            tender.TenderCategoryName = dto.TenderCategory;
             tender.SubmissionDeadline = dto.SubmissionDeadline;
             tender.ModifiedBy = currentUserId;
             tender.ModifiedDate = DateTime.UtcNow;
@@ -133,6 +139,23 @@ namespace TenderManagement.Application.Services
 
             var saved = await _unitOfWork.Tenders.GetWithDetailsAsync(tender.TenderId);
             return MapToDetailDto(saved!);
+        }
+
+        private async Task ValidateTenderCatalogValuesAsync(string methodName, string categoryName)
+        {
+            var methods = await _unitOfWork.TenderMethods.FindAsync(
+                method => method.MethodName == methodName && method.IsActive);
+            if (!methods.Any())
+            {
+                throw new BusinessRuleException("Select an active tender method.");
+            }
+
+            var categories = await _unitOfWork.TenderCategories.FindAsync(
+                category => category.TypeName == categoryName && category.IsActive);
+            if (!categories.Any())
+            {
+                throw new BusinessRuleException("Select an active tender category.");
+            }
         }
 
         public async Task DeleteTenderAsync(int id, int currentUserId)
@@ -307,6 +330,7 @@ namespace TenderManagement.Application.Services
             Title = t.Title,
             DepartmentName = t.Department?.DepartmentName ?? string.Empty,
             TenderType = t.TenderType,
+            TenderCategory = t.TenderCategoryName,
             EstimatedAmount = t.EstimatedAmount,
             CurrentStatus = t.CurrentStatus,
             PublicationDate = t.ApprovalHistories
@@ -333,6 +357,7 @@ namespace TenderManagement.Application.Services
             EstimatedAmount = t.EstimatedAmount,
             CurrentStatus = t.CurrentStatus,
             TenderType = t.TenderType,
+            TenderCategory = t.TenderCategoryName,
             PublicationDate = t.ApprovalHistories
                 .Where(h => h.NewStatus == TenderStatus.TenderPublished)
                 .Select(h => (DateTime?)h.ApprovalDate)

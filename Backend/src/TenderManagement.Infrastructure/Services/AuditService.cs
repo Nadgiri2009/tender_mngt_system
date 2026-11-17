@@ -13,9 +13,11 @@ namespace TenderManagement.Infrastructure.Services
             _context = context;
         }
 
-        public async Task LogAsync(int? userId, string action, string entityName, int? entityId, string? details = null)
+        public async Task LogAsync(
+            int? userId, string action, string entityName, int? entityId,
+            string? details = null, CancellationToken cancellationToken = default)
         {
-            _context.AuditLogs.Add(new AuditLog
+            await _context.AuditLogs.AddAsync(new AuditLog
             {
                 UserId = userId,
                 Action = action,
@@ -23,8 +25,8 @@ namespace TenderManagement.Infrastructure.Services
                 EntityId = entityId,
                 Details = details,
                 CreatedDate = DateTime.UtcNow
-            });
-            await _context.SaveChangesAsync();
+            }, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

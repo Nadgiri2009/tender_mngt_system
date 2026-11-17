@@ -16,7 +16,8 @@ namespace DepartmentModule.Pages
         protected HyperLink PublicationLink, BidDocumentsLink;
         protected Panel OpeningPanel, OpenedPanel, EvaluationDetailPanel, SettingsPanel;
         protected GridView OpeningGrid, EvaluationGrid;
-        protected TextBox OpeningDesignation, OpeningRemarks, TechnicalOutcome, FinancialOutcome,
+        protected DropDownList OpeningDesignation;
+        protected TextBox OpeningRemarks, TechnicalOutcome, FinancialOutcome,
             Observations, Recommendation, DelayDays;
         protected FileUpload EvaluationReportFile;
         protected Button StartEvaluationButton, SaveEvaluationButton, ForwardEvaluationButton, SaveDelayButton;
@@ -34,6 +35,7 @@ namespace DepartmentModule.Pages
             SettingsPanel.Visible = IsAdministrator;
             if (!IsPostBack)
             {
+                if (CanOpen) BindDesignations();
                 BindOpeningQueue();
                 BindEvaluationQueue();
                 if (IsAdministrator) BindEvaluationSettings();
@@ -80,7 +82,7 @@ namespace DepartmentModule.Pages
                 AddDepartmentScope(command);
                 DataTable data = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(data);
-                ConvertDatesToIndia(data, "OriginalClosingUtc", "CurrentClosingUtc");
+                TenderLifecycleFiles.ConvertDatesToIndia(data, "OriginalClosingUtc", "CurrentClosingUtc");
                 OpeningGrid.DataSource = data;
                 OpeningGrid.DataBind();
             }
@@ -103,7 +105,7 @@ namespace DepartmentModule.Pages
                 AddDepartmentScope(command);
                 DataTable data = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(data);
-                ConvertDatesToIndia(data, "ActualOpeningUtc", "EvaluationEligibleAtUtc");
+                TenderLifecycleFiles.ConvertDatesToIndia(data, "ActualOpeningUtc", "EvaluationEligibleAtUtc");
                 EvaluationGrid.DataSource = data;
                 EvaluationGrid.DataBind();
             }
@@ -207,8 +209,37 @@ namespace DepartmentModule.Pages
             {
                 object value = command.ExecuteScalar();
                 if (value == null || value == DBNull.Value)
-                    throw new InvalidOperationException("Tender evaluation settings have not been initialized.");
+                {
+                    DelayDays.Text = String.Empty;
+                    return;
+                }
                 DelayDays.Text = Convert.ToString(value, CultureInfo.InvariantCulture);
+            }
+        }
+
+        private void BindDesignations()
+        {
+            OpeningDesignation.Items.Clear();
+            OpeningDesignation.Items.Add(new ListItem("Select designation", String.Empty));
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                using (SqlCommand command = new SqlCommand(
+                    "SELECT DesignationName FROM dbo.Designations WHERE IsActive=1 ORDER BY SortOrder,DesignationName;", connection))
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string designation = Convert.ToString(reader["DesignationName"], CultureInfo.InvariantCulture);
+                        OpeningDesignation.Items.Add(new ListItem(designation, designation));
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Opening officer designations could not be loaded.", ex);
+                ShowError("Officer designations could not be loaded. Please retry or contact support.");
+                OpeningPanel.Visible = false;
             }
         }
 
@@ -217,7 +248,8 @@ namespace DepartmentModule.Pages
             if (e.CommandName != "OpenBids") return;
             int tenderId;
             if (!CanOpen || !Int32.TryParse(Convert.ToString(e.CommandArgument, CultureInfo.InvariantCulture), out tenderId) ||
-                tenderId <= 0 || String.IsNullOrWhiteSpace(OpeningDesignation.Text) || OpeningDesignation.Text.Trim().Length > 150 ||
+                tenderId <= 0 || String.IsNullOrWhiteSpace(OpeningDesignation.SelectedValue) ||
+                OpeningDesignation.SelectedValue.Length > 150 ||
                 OpeningRemarks.Text.Length > 1000)
             {
                 ShowError("Enter a designation (maximum 150 characters) and valid opening remarks.");
@@ -235,7 +267,7 @@ namespace DepartmentModule.Pages
                     AddText(command, "@RoleAtAction", SqlDbType.NVarChar, CurrentRole, 50);
                     ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
                         CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
-                    AddText(command, "@Designation", SqlDbType.NVarChar, OpeningDesignation.Text, 150);
+                    AddText(command, "@Designation", SqlDbType.NVarChar, OpeningDesignation.SelectedValue, 150);
                     AddText(command, "@Remarks", SqlDbType.NVarChar, OpeningRemarks.Text, 1000);
                     command.ExecuteNonQuery();
                 }
@@ -517,14 +549,18 @@ namespace DepartmentModule.Pages
                         @"IF NOT EXISTS(SELECT 1 FROM dbo.Users u INNER JOIN dbo.Roles r ON r.RoleId=u.RoleId
                                         WHERE u.UserId=@UserId AND u.IsActive=1 AND r.RoleName=N'Admin')
                               THROW 51066, 'Only an administrator can change the evaluation delay.', 1;
-                          UPDATE dbo.TenderEvaluationSettings
-                          SET StartDelayDays=@Days,ModifiedBy=@UserId,ModifiedAtUtc=SYSUTCDATETIME()
-                          WHERE SettingsId=1;", connection, transaction))
+                          IF EXISTS(SELECT 1 FROM dbo.TenderEvaluationSettings WITH (UPDLOCK,HOLDLOCK) WHERE SettingsId=1)
+                              UPDATE dbo.TenderEvaluationSettings
+                              SET StartDelayDays=@Days,ModifiedBy=@UserId,ModifiedAtUtc=SYSUTCDATETIME()
+                              WHERE SettingsId=1;
+                          ELSE
+                              INSERT INTO dbo.TenderEvaluationSettings(SettingsId,StartDelayDays,ModifiedBy)
+                              VALUES(1,@Days,@UserId);", connection, transaction))
                     {
                         ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
                         ModuleDb.AddParameter(command, "@Days", SqlDbType.Int, days);
                         if (command.ExecuteNonQuery() != 1)
-                            throw new InvalidOperationException("Evaluation settings were not initialized by the database migration.");
+                            throw new InvalidOperationException("Evaluation settings could not be saved.");
                     }
                     ModuleDb.AddAudit(connection, transaction, CurrentUserId, "UpdateEvaluationDelay",
                         "TenderEvaluationSettings", 1, days.ToString(CultureInfo.InvariantCulture), Request.UserHostAddress);
@@ -536,23 +572,6 @@ namespace DepartmentModule.Pages
             {
                 Trace.Warn("DepartmentModule", "Evaluation delay could not be saved.", ex);
                 ShowError("Evaluation delay could not be saved.");
-            }
-        }
-
-        private static void ConvertDatesToIndia(DataTable data, params string[] columns)
-        {
-            foreach (string column in columns)
-            {
-                if (!data.Columns.Contains(column)) continue;
-                foreach (DataRow row in data.Rows)
-                {
-                    if (row[column] != DBNull.Value)
-                    {
-                        row[column] = TimeZoneInfo.ConvertTimeFromUtc(
-                            DateTime.SpecifyKind(Convert.ToDateTime(row[column], CultureInfo.InvariantCulture), DateTimeKind.Utc),
-                            TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
-                    }
-                }
             }
         }
 

@@ -70,18 +70,17 @@ controllers for equivalent gaps.
   `/api/dashboard/admin-stats` (admin dashboard, status breakdown).
 - `AdminUsersController` — Admin-only staff account creation/listing/
   activation, the direct consequence of the registration security fix.
-- **Schema change**: `Announcements` table added to
-  `Database/DatabaseSetup.sql` (fresh installs) and a new
-  `Database/04_AddAnnouncements_Incremental.sql` (existing databases —
-  run this if you already have a populated DB, since the master script
-  is fresh-create-only and will error on an existing database).
+-   **Historical schema note:** this status report predates database
+  consolidation. The former setup and migration scripts named here are
+  archived and must not be run. Use the repository-root
+  `SMC_TENDER_DATABASE.sql`; follow its Fresh/Upgrade instructions in the
+  current root and Frontend READMEs. Upgrade mode must be rehearsed on a
+  verified restored copy before a production change.
 
-**Correction to Pass 1's README**: I told you to run
-`dotnet ef migrations add` for the `CreatedByName` fix. That was wrong on
-two counts — this project is SQL-first (there's a README in
-`Migrations/` saying so explicitly, which I hadn't read yet), and the
-`CreatedBy` foreign key already existed in `DatabaseSetup.sql` anyway.
-Nothing needed migrating. Ignore that instruction from Pass 1.
+  **Correction to Pass 1's README:** the old `dotnet ef migrations add`
+  instruction was not the supported schema path. The current schema is
+  maintained by the single canonical SQL installer; do not generate or run
+  independent EF migrations for database installation.
 
 **Frontend (new), verified via `tsc --noEmit` (0 errors) and `next build`
 (12/12 routes compiled) against the exact zip contents, twice:**

@@ -18,8 +18,16 @@ export interface AuthResponse {
 }
 
 export interface LoginInput {
-  email: string;
-  password: string;
+  mobile: string;
+  otp: string;
+}
+
+export interface RequestLoginOtpInput {
+  mobile: string;
+}
+
+export interface RequestLoginOtpResponse {
+  message: string;
 }
 
 // Mirrors Backend RegisterRequestDto exactly

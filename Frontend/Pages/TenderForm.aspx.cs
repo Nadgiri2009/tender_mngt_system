@@ -17,8 +17,13 @@ namespace DepartmentModule.Pages
         protected Literal FormTitle, FormHeading, FormDescription;
         protected TextBox TitleText;
         protected TextBox DescriptionText;
+        protected TextBox BudgetInformationText, TechnicalSanctionNumberText, TechnicalSanctionAuthorityText,
+            TechnicalSanctionDateText, PreBidMeetingText, PreBidLocationText, PreBidDetailsText,
+            TechnicalBidOpeningText;
         protected DropDownList DepartmentSelect;
         protected DropDownList TenderTypeSelect;
+        protected DropDownList TenderCategorySelect;
+        protected DropDownList DocumentTypeSelect;
         protected TextBox AmountText;
         protected TextBox StartText, DeadlineText;
         protected FileUpload Attachments;
@@ -26,18 +31,18 @@ namespace DepartmentModule.Pages
         protected Panel DepartmentPanel, AttachmentPanel;
         protected RequiredFieldValidator DepartmentRequired;
 
-        private static readonly string[] TenderTypes = { "Open", "Limited", "Single", "EOI" };
         private static readonly string[] AllowedExtensions = { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png" };
         private int EditingTenderId { get { return QueryId("id"); } }
 
         protected void Page_Load(object sender, EventArgs e)
         {
             bool isEditing = EditingTenderId > 0;
+            bool isJe = HasAnyRole("Junior Engineer (JE)");
             if (isEditing)
             {
                 if (!RequireRoles("Admin", "DepartmentOfficer")) return;
             }
-            else if (!RequireRoles("DepartmentOfficer", "Admin")) return;
+            else if (!RequireAnyPermission("tender.create.department", "tenders.manage.all")) return;
 
             FormTitle.Text = isEditing ? "Edit Tender" : "New Tender";
             FormHeading.Text = isEditing ? "Edit Tender Requirement" : "New Tender Requirement";
@@ -45,7 +50,7 @@ namespace DepartmentModule.Pages
                 ? "Drafts are editable by administrators. Returned budget proposals can be revised by their owning department officer."
                 : "Create a draft requirement for department processing.";
             CreateButton.Text = isEditing ? "Save Changes" : "Create Tender";
-            DepartmentPanel.Visible = !isEditing;
+            DepartmentPanel.Visible = !isEditing && !isJe;
             DepartmentRequired.Enabled = !isEditing;
             AttachmentPanel.Visible = !isEditing;
 
@@ -53,9 +58,10 @@ namespace DepartmentModule.Pages
             {
                 try
                 {
-                    if (!isEditing)
+                    using (SqlConnection connection = ModuleDb.OpenConnection())
                     {
-                        using (SqlConnection connection = ModuleDb.OpenConnection())
+                        if (!isEditing && !isJe)
+                        {
                         using (SqlCommand command = new SqlCommand("SELECT DepartmentId, DepartmentName FROM dbo.Departments WHERE IsActive=1 ORDER BY DepartmentName;", connection))
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
@@ -68,10 +74,12 @@ namespace DepartmentModule.Pages
                                 if (CurrentDepartmentId.HasValue && CurrentDepartmentId.Value == reader.GetInt32(0)) item.Selected = true;
                             }
                         }
-                    }
+                        }
 
-                    TenderTypeSelect.Items.Add(new ListItem("Select tender type", ""));
-                    foreach (string type in TenderTypes) TenderTypeSelect.Items.Add(new ListItem(type, type));
+                        BindTenderCatalog(connection, TenderTypeSelect, "SELECT MethodName FROM dbo.TenderMethods WHERE IsActive=1 ORDER BY SortOrder,MethodName;", "Select tender method");
+                        BindTenderCatalog(connection, TenderCategorySelect, "SELECT TypeName FROM dbo.TenderTypes WHERE IsActive=1 ORDER BY SortOrder,TypeName;", "Select tender category");
+                        BindTenderCatalog(connection, DocumentTypeSelect, "SELECT TypeName FROM dbo.DocumentTypes WHERE IsActive=1 ORDER BY SortOrder,TypeName;", "Select attachment type");
+                    }
 
                     if (isEditing) LoadTenderForEdit();
                 }
@@ -84,13 +92,28 @@ namespace DepartmentModule.Pages
             }
         }
 
+        private static void BindTenderCatalog(SqlConnection connection, DropDownList control, string query, string placeholder)
+        {
+            control.Items.Clear();
+            control.Items.Add(new ListItem(placeholder, ""));
+            using (SqlCommand command = new SqlCommand(query, connection))
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string value = Convert.ToString(reader[0]);
+                    control.Items.Add(new ListItem(value, value));
+                }
+            }
+        }
+
         private void LoadTenderForEdit()
         {
             using (SqlConnection connection = ModuleDb.OpenConnection())
             using (SqlCommand command = new SqlCommand(
-                @"SELECT Title,Description,EstimatedAmount,TenderType,SubmissionStartDate,SubmissionDeadline,CurrentStatus
+                @"SELECT Title,Description,EstimatedAmount,TenderType,TenderCategory,SubmissionStartDate,SubmissionDeadline,CurrentStatus
                   FROM dbo.Tender t
-                  WHERE TenderId=@TenderId AND IsDeleted=0
+                  WHERE TenderId=@TenderId AND IsDeleted=0 AND WorkflowVersion=1
                     AND (@Role=N'Admin'
                          OR (@Role=N'DepartmentOfficer' AND t.CreatedBy=@UserId
                              AND t.CurrentStatus=N'Budget Revision Required'
@@ -132,6 +155,10 @@ namespace DepartmentModule.Pages
                     if (TenderTypeSelect.Items.FindByValue(tenderType) == null)
                         TenderTypeSelect.Items.Add(new ListItem(tenderType, tenderType));
                     TenderTypeSelect.SelectedValue = tenderType;
+                    string tenderCategory = Convert.ToString(reader["TenderCategory"] == DBNull.Value ? String.Empty : reader["TenderCategory"]);
+                    if (tenderCategory.Length > 0 && TenderCategorySelect.Items.FindByValue(tenderCategory) == null)
+                        TenderCategorySelect.Items.Add(new ListItem(tenderCategory, tenderCategory));
+                    if (tenderCategory.Length > 0) TenderCategorySelect.SelectedValue = tenderCategory;
                     StartText.Text = reader["SubmissionStartDate"] == DBNull.Value
                         ? String.Empty
                         : Convert.ToDateTime(reader["SubmissionStartDate"]).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
@@ -163,20 +190,58 @@ namespace DepartmentModule.Pages
 
             decimal amount;
             int departmentId = 0;
+            bool validTenderCatalog;
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                {
+                    validTenderCatalog =
+                        IsActiveCatalogValue(connection, "dbo.TenderMethods", "MethodName", TenderTypeSelect.SelectedValue) &&
+                        IsActiveCatalogValue(connection, "dbo.TenderTypes", "TypeName", TenderCategorySelect.SelectedValue);
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Tender reference data could not be validated.", ex);
+                ShowError("Tender method or category could not be validated. Please retry or contact support.");
+                return;
+            }
             DateTime start;
             DateTime deadline;
             DateTime? submissionStart = null;
             DateTime? submissionDeadline = null;
             if (!Decimal.TryParse(AmountText.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out amount) || amount <= 0 ||
-                (EditingTenderId == 0 && (!Int32.TryParse(DepartmentSelect.SelectedValue, out departmentId) || departmentId <= 0)) ||
-                !Array.Exists(TenderTypes, t => t == TenderTypeSelect.SelectedValue))
+                (EditingTenderId == 0 && !TryGetAuthorizedDepartmentId(out departmentId)) ||
+                !validTenderCatalog)
             {
-                ShowError("Enter a valid department, tender type, and positive estimated amount.");
+                ShowError("Select an active department, tender method, tender category, and positive estimated amount.");
                 return;
             }
             if (DescriptionText.Text != null && DescriptionText.Text.Length > 4000)
             {
                 ShowError("Description cannot exceed 4,000 characters.");
+                return;
+            }
+            if ((BudgetInformationText.Text != null && BudgetInformationText.Text.Length > 2000) ||
+                (TechnicalSanctionNumberText.Text != null && TechnicalSanctionNumberText.Text.Length > 100) ||
+                (TechnicalSanctionAuthorityText.Text != null && TechnicalSanctionAuthorityText.Text.Length > 200) ||
+                (PreBidLocationText.Text != null && PreBidLocationText.Text.Length > 300) ||
+                (PreBidDetailsText.Text != null && PreBidDetailsText.Text.Length > 2000))
+            {
+                ShowError("Budget, sanction, and pre-bid details exceed the allowed field lengths.");
+                return;
+            }
+            DateTime sanctionDate = DateTime.MinValue;
+            DateTime preBidMeetingUtc = DateTime.MinValue;
+            DateTime technicalBidOpeningUtc = DateTime.MinValue;
+            bool hasSanctionDate = !String.IsNullOrWhiteSpace(TechnicalSanctionDateText.Text);
+            bool hasPreBidMeeting = !String.IsNullOrWhiteSpace(PreBidMeetingText.Text);
+            bool hasTechnicalBidOpening = !String.IsNullOrWhiteSpace(TechnicalBidOpeningText.Text);
+            if ((hasSanctionDate && !TryParseDate(TechnicalSanctionDateText.Text, out sanctionDate)) ||
+                (hasPreBidMeeting && !TryParseIndiaLocalDateTime(PreBidMeetingText.Text, out preBidMeetingUtc)) ||
+                (hasTechnicalBidOpening && !TryParseIndiaLocalDateTime(TechnicalBidOpeningText.Text, out technicalBidOpeningUtc)))
+            {
+                ShowError("Enter valid technical-sanction, pre-bid, and technical-opening dates.");
                 return;
             }
             if (!String.IsNullOrWhiteSpace(DeadlineText.Text))
@@ -217,6 +282,20 @@ namespace DepartmentModule.Pages
                 ShowError(fileError);
                 return;
             }
+            try
+            {
+                if (files.Count > 0 && !TenderLifecycleFiles.IsAllowedTenderDocumentType(DocumentTypeSelect.SelectedValue))
+                {
+                    ShowError("Select an active attachment type.");
+                    return;
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Document type could not be validated.", ex);
+                ShowError("Attachment type could not be validated. Please retry or contact support.");
+                return;
+            }
 
             List<string> savedPaths = new List<string>();
             try
@@ -224,6 +303,13 @@ namespace DepartmentModule.Pages
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 using (SqlTransaction transaction = connection.BeginTransaction())
                 {
+                    if (!IsActiveCatalogValue(connection, "dbo.TenderMethods", "MethodName", TenderTypeSelect.SelectedValue, transaction) ||
+                        !IsActiveCatalogValue(connection, "dbo.TenderTypes", "TypeName", TenderCategorySelect.SelectedValue, transaction))
+                        throw new InvalidOperationException("The selected tender method or category is no longer active. Refresh the form and retry.");
+                    if (files.Count > 0 &&
+                        !IsActiveCatalogValue(connection, "dbo.DocumentTypes", "TypeName", DocumentTypeSelect.SelectedValue, transaction))
+                        throw new InvalidOperationException("The selected attachment type is no longer active. Refresh the form and retry.");
+
                     int tenderId;
                     int year = DateTime.UtcNow.Year;
                     string tenderNumber;
@@ -245,8 +331,16 @@ namespace DepartmentModule.Pages
                     }
 
                     using (SqlCommand command = new SqlCommand(
-                        @"INSERT INTO dbo.Tender (TenderNumber, TrackingId, Title, Description, DepartmentId, EstimatedAmount, TenderType, CurrentStatus, SubmissionStartDate, SubmissionDeadline, CreatedBy)
-                          VALUES (@TenderNumber, @TrackingId, @Title, @Description, @DepartmentId, @Amount, @TenderType, N'Draft', @StartDate, @Deadline, @CreatedBy);
+                        @"INSERT INTO dbo.Tender
+                            (TenderNumber,TrackingId,Title,Description,DepartmentId,EstimatedAmount,TenderType,TenderCategory,
+                             CurrentStatus,SubmissionStartDate,SubmissionDeadline,CreatedBy,WorkflowVersion,
+                             BudgetInformation,TechnicalSanctionNumber,TechnicalSanctionAuthority,TechnicalSanctionDate,
+                             PreBidMeetingUtc,PreBidLocation,PreBidDetails,TechnicalBidOpeningScheduledUtc)
+                          VALUES
+                            (@TenderNumber,@TrackingId,@Title,@Description,@DepartmentId,@Amount,@TenderType,@TenderCategory,
+                             N'Draft',@StartDate,@Deadline,@CreatedBy,2,@BudgetInformation,@SanctionNumber,
+                             @SanctionAuthority,@SanctionDate,@PreBidMeetingUtc,@PreBidLocation,@PreBidDetails,
+                             @TechnicalBidOpeningUtc);
                           SELECT CAST(SCOPE_IDENTITY() AS int);", connection, transaction))
                     {
                         AddText(command, "@TenderNumber", SqlDbType.NVarChar, tenderNumber, 50);
@@ -256,11 +350,68 @@ namespace DepartmentModule.Pages
                         ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int, departmentId);
                         ModuleDb.AddParameter(command, "@Amount", SqlDbType.Decimal, amount);
                         AddText(command, "@TenderType", SqlDbType.NVarChar, TenderTypeSelect.SelectedValue, 50);
+                        AddText(command, "@TenderCategory", SqlDbType.NVarChar, TenderCategorySelect.SelectedValue, 50);
                         ModuleDb.AddParameter(command, "@StartDate", SqlDbType.DateTime2,
                             submissionStart.HasValue ? (object)submissionStart.Value : null);
                         ModuleDb.AddParameter(command, "@Deadline", SqlDbType.DateTime2, submissionDeadline.HasValue ? (object)submissionDeadline.Value : null);
                         ModuleDb.AddParameter(command, "@CreatedBy", SqlDbType.Int, CurrentUserId);
+                        AddText(command, "@BudgetInformation", SqlDbType.NVarChar, BudgetInformationText.Text, 2000);
+                        AddText(command, "@SanctionNumber", SqlDbType.NVarChar, TechnicalSanctionNumberText.Text, 100);
+                        AddText(command, "@SanctionAuthority", SqlDbType.NVarChar, TechnicalSanctionAuthorityText.Text, 200);
+                        ModuleDb.AddParameter(command, "@SanctionDate", SqlDbType.Date,
+                            hasSanctionDate ? (object)sanctionDate.Date : null);
+                        ModuleDb.AddParameter(command, "@PreBidMeetingUtc", SqlDbType.DateTime2,
+                            hasPreBidMeeting ? (object)preBidMeetingUtc : null);
+                        AddText(command, "@PreBidLocation", SqlDbType.NVarChar, PreBidLocationText.Text, 300);
+                        AddText(command, "@PreBidDetails", SqlDbType.NVarChar, PreBidDetailsText.Text, 2000);
+                        ModuleDb.AddParameter(command, "@TechnicalBidOpeningUtc", SqlDbType.DateTime2,
+                            hasTechnicalBidOpening ? (object)technicalBidOpeningUtc : null);
                         tenderId = Convert.ToInt32(command.ExecuteScalar());
+                    }
+
+                    int jeRoleId;
+                    int initialStageId;
+                    using (SqlCommand command = new SqlCommand(
+                        @"SELECT r.RoleId,s.StageId
+                          FROM dbo.Roles r
+                          CROSS JOIN dbo.WorkflowStages s
+                          WHERE r.RoleName=N'Junior Engineer (JE)' AND r.IsActive=1
+                            AND s.WorkflowVersion=2 AND s.StageName=N'Final_JE_SubmitTender';", connection, transaction))
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (!reader.Read())
+                            throw new InvalidOperationException("The initial finalized workflow stage is not configured.");
+                        jeRoleId = Convert.ToInt32(reader["RoleId"]);
+                        initialStageId = Convert.ToInt32(reader["StageId"]);
+                    }
+                    using (SqlCommand command = new SqlCommand(
+                        @"INSERT INTO dbo.TenderWorkflowAssignments
+                            (TenderId,StageId,AssignedRoleId,AssignedUserId,DepartmentId,IsCurrent)
+                          VALUES(@TenderId,@StageId,@RoleId,@AssignedUserId,@DepartmentId,1);",
+                        connection, transaction))
+                    {
+                        ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, tenderId);
+                        ModuleDb.AddParameter(command, "@StageId", SqlDbType.Int, initialStageId);
+                        ModuleDb.AddParameter(command, "@RoleId", SqlDbType.Int, jeRoleId);
+                        ModuleDb.AddParameter(command, "@AssignedUserId", SqlDbType.Int,
+                            HasAnyRole("Junior Engineer (JE)") ? (object)CurrentUserId : null);
+                        ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int, departmentId);
+                        command.ExecuteNonQuery();
+                    }
+                    using (SqlCommand command = new SqlCommand(
+                        @"INSERT INTO dbo.TenderWorkflowHistory
+                            (TenderId,WorkflowVersion,StageId,PreviousStatus,NewStatus,ActionName,
+                             UserId,RoleId,DepartmentId,Remarks)
+                          VALUES(@TenderId,2,@StageId,NULL,N'Draft',N'Created',@UserId,@RoleId,@DepartmentId,@Remarks);",
+                        connection, transaction))
+                    {
+                        ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, tenderId);
+                        ModuleDb.AddParameter(command, "@StageId", SqlDbType.Int, initialStageId);
+                        ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                        ModuleDb.AddParameter(command, "@RoleId", SqlDbType.Int, CurrentRoleId);
+                        ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int, departmentId);
+                        AddText(command, "@Remarks", SqlDbType.NVarChar, "Draft tender created.", 2000);
+                        command.ExecuteNonQuery();
                     }
 
                     foreach (PostedFileInfo file in files)
@@ -276,14 +427,16 @@ namespace DepartmentModule.Pages
                         savedPaths.Add(fullPath);
                         using (SqlCommand command = new SqlCommand(
                             @"INSERT INTO dbo.TenderDocuments (TenderId, DocumentType, FileName, FilePath, UploadedBy)
-                              VALUES (@TenderId, N'Attachment', @FileName, @FilePath, @UploadedBy);", connection, transaction))
+                              VALUES (@TenderId, @DocumentType, @FileName, @FilePath, @UploadedBy);", connection, transaction))
                         {
                             ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, tenderId);
+                            AddText(command, "@DocumentType", SqlDbType.NVarChar, DocumentTypeSelect.SelectedValue, 160);
                             AddText(command, "@FileName", SqlDbType.NVarChar, file.OriginalName, 260);
                             AddText(command, "@FilePath", SqlDbType.NVarChar, relativePath, 400);
                             ModuleDb.AddParameter(command, "@UploadedBy", SqlDbType.Int, CurrentUserId);
                             command.ExecuteNonQuery();
                         }
+
                     }
                     ModuleDb.AddAudit(connection, transaction, CurrentUserId, "Create", "Tender", tenderId, tenderNumber, Request.UserHostAddress);
                     transaction.Commit();
@@ -310,6 +463,47 @@ namespace DepartmentModule.Pages
             }
         }
 
+        private bool TryGetAuthorizedDepartmentId(out int departmentId)
+        {
+            departmentId = 0;
+            if (HasAnyRole("Junior Engineer (JE)"))
+            {
+                if (!CurrentDepartmentId.HasValue) return false;
+                departmentId = CurrentDepartmentId.Value;
+                return true;
+            }
+            return Int32.TryParse(DepartmentSelect.SelectedValue, out departmentId) && departmentId > 0;
+        }
+
+        private static bool TryParseDate(string value, out DateTime result)
+        {
+            return DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out result);
+        }
+
+        private static bool TryParseIndiaLocalDateTime(string value, out DateTime utc)
+        {
+            utc = DateTime.MinValue;
+            DateTime localTime;
+            if (!DateTime.TryParseExact(value, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out localTime))
+                return false;
+            TimeZoneInfo indiaTimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localTime, DateTimeKind.Unspecified), indiaTimeZone);
+            return true;
+        }
+
+        private static bool IsActiveCatalogValue(SqlConnection connection, string tableName, string columnName,
+            string value, SqlTransaction transaction = null)
+        {
+            string query = "SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + "=@Value AND IsActive=1;";
+            using (SqlCommand command = new SqlCommand(query, connection, transaction))
+            {
+                AddText(command, "@Value", SqlDbType.NVarChar, value, 80);
+                return Convert.ToInt32(command.ExecuteScalar()) == 1;
+            }
+        }
+
         private void UpdateDraftTender(decimal amount, DateTime? submissionStart, DateTime? submissionDeadline)
         {
             try
@@ -317,10 +511,13 @@ namespace DepartmentModule.Pages
                 using (SqlConnection connection = ModuleDb.OpenConnection())
                 using (SqlTransaction transaction = connection.BeginTransaction())
                 {
+                    if (!IsActiveCatalogValue(connection, "dbo.TenderMethods", "MethodName", TenderTypeSelect.SelectedValue, transaction) ||
+                        !IsActiveCatalogValue(connection, "dbo.TenderTypes", "TypeName", TenderCategorySelect.SelectedValue, transaction))
+                        throw new InvalidOperationException("The selected tender method or category is no longer active. Refresh the form and retry.");
                     string currentStatus;
                     using (SqlCommand read = new SqlCommand(
                         @"SELECT t.CurrentStatus FROM dbo.Tender t WITH (UPDLOCK,ROWLOCK)
-                          WHERE t.TenderId=@TenderId AND t.IsDeleted=0
+                          WHERE t.TenderId=@TenderId AND t.IsDeleted=0 AND t.WorkflowVersion=1
                             AND (@Role=N'Admin' OR
                                  (@Role=N'DepartmentOfficer' AND t.CreatedBy=@UserId
                                   AND t.CurrentStatus=N'Budget Revision Required'
@@ -347,15 +544,17 @@ namespace DepartmentModule.Pages
                     using (SqlCommand command = new SqlCommand(
                         @"UPDATE dbo.Tender
                           SET Title=@Title,Description=@Description,EstimatedAmount=@Amount,TenderType=@TenderType,
+                              TenderCategory=@TenderCategory,
                               SubmissionStartDate=@StartDate,SubmissionDeadline=@Deadline,
                               ModifiedBy=@ModifiedBy,ModifiedDate=SYSUTCDATETIME()
-                          WHERE TenderId=@TenderId AND CurrentStatus=@ExpectedStatus AND IsDeleted=0
+                          WHERE TenderId=@TenderId AND CurrentStatus=@ExpectedStatus AND IsDeleted=0 AND WorkflowVersion=1
                             AND (@Role=N'Admin' OR (@Role=N'DepartmentOfficer' AND CreatedBy=@UserId));", connection, transaction))
                     {
                         AddText(command, "@Title", SqlDbType.NVarChar, TitleText.Text.Trim(), 250);
                         AddText(command, "@Description", SqlDbType.NVarChar, DescriptionText.Text, -1);
                         ModuleDb.AddParameter(command, "@Amount", SqlDbType.Decimal, amount);
                         AddText(command, "@TenderType", SqlDbType.NVarChar, TenderTypeSelect.SelectedValue, 50);
+                        AddText(command, "@TenderCategory", SqlDbType.NVarChar, TenderCategorySelect.SelectedValue, 50);
                         ModuleDb.AddParameter(command, "@StartDate", SqlDbType.DateTime2,
                             submissionStart.HasValue ? (object)submissionStart.Value : null);
                         ModuleDb.AddParameter(command, "@Deadline", SqlDbType.DateTime2,

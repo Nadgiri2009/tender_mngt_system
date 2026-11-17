@@ -84,7 +84,7 @@ namespace DepartmentModule.Pages
                     ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
                 DataTable data = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(data);
-                ConvertDatesToIndia(data, "PublicationStartUtc", "OriginalClosingUtc", "CurrentClosingUtc");
+                TenderLifecycleFiles.ConvertDatesToIndia(data, "PublicationStartUtc", "OriginalClosingUtc", "CurrentClosingUtc");
                 PublishedTendersGrid.DataSource = data;
                 PublishedTendersGrid.DataBind();
             }
@@ -157,7 +157,7 @@ namespace DepartmentModule.Pages
                 AddDepartmentScope(command);
                 DataTable data = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(data);
-                ConvertDatesToIndia(data, "OriginalClosingUtc", "ProposedClosingUtc");
+                TenderLifecycleFiles.ConvertDatesToIndia(data, "OriginalClosingUtc", "ProposedClosingUtc");
                 PendingRequestsGrid.DataSource = data;
                 PendingRequestsGrid.DataBind();
             }
@@ -187,7 +187,7 @@ namespace DepartmentModule.Pages
                 if (TenderId > 0) ModuleDb.AddParameter(command, "@TenderId", SqlDbType.Int, TenderId);
                 DataTable data = new DataTable();
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command)) adapter.Fill(data);
-                ConvertDatesToIndia(data, "OriginalClosingUtc", "ProposedClosingUtc", "SubmittedAtUtc", "ReviewedAtUtc");
+                TenderLifecycleFiles.ConvertDatesToIndia(data, "OriginalClosingUtc", "ProposedClosingUtc", "SubmittedAtUtc", "ReviewedAtUtc");
                 ExtensionHistoryGrid.DataSource = data;
                 ExtensionHistoryGrid.DataBind();
             }
@@ -391,23 +391,6 @@ namespace DepartmentModule.Pages
             {
                 Trace.Warn("DepartmentModule", "Tender extension review failed.", ex);
                 ShowError(ex.Number >= 51000 && ex.Number <= 51099 ? ex.Message : "The extension decision could not be saved.");
-            }
-        }
-
-        private static void ConvertDatesToIndia(DataTable data, params string[] columns)
-        {
-            foreach (string column in columns)
-            {
-                if (!data.Columns.Contains(column)) continue;
-                foreach (DataRow row in data.Rows)
-                {
-                    if (row[column] != DBNull.Value)
-                    {
-                        row[column] = TimeZoneInfo.ConvertTimeFromUtc(
-                            DateTime.SpecifyKind(Convert.ToDateTime(row[column], CultureInfo.InvariantCulture), DateTimeKind.Utc),
-                            TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
-                    }
-                }
             }
         }
 

@@ -169,7 +169,7 @@ namespace DepartmentModule.Pages
                 {
                     int roleId;
                     using (SqlCommand roleCommand = new SqlCommand(
-                        "SELECT RoleId FROM dbo.Roles WHERE RoleName=N'Contractor' AND IsActive=1;",
+                        "SELECT RoleId FROM dbo.Roles WHERE RoleName=N'Contractor / Vendor' AND IsActive=1;",
                         connection, transaction))
                     {
                         object roleValue = roleCommand.ExecuteScalar();
@@ -207,7 +207,7 @@ namespace DepartmentModule.Pages
                     ModuleDb.AddAudit(connection, transaction, userId, "Register", "User", userId, null, Request.UserHostAddress);
                     transaction.Commit();
                     ClearOtpChallenge();
-                    EstablishSession(userId, fullName, "Contractor", null);
+                    EstablishSession(userId, fullName, "Contractor / Vendor", null);
                     int applyTenderId = GetApplyTenderId();
                     string destination = applyTenderId > 0
                         ? "~/Pages/Bids.aspx?tenderId=" + applyTenderId.ToString()

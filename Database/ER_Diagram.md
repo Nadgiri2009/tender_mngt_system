@@ -1,4 +1,7 @@
-# Tender Management System – Database ER Diagram
+# Tender Management System - Database ER Diagram
+
+`SMC_TENDER_DATABASE.sql` is the authoritative definition for all database objects. This diagram
+shows the principal business relationships; it is not a substitute for the complete DDL.
 
 ```mermaid
 erDiagram
@@ -27,6 +30,29 @@ erDiagram
     Users ||--o{ ApprovalHistory : "acts on"
     Users ||--o{ AuditLog : "performs"
     Roles ||--o{ WorkflowStages : "approves at"
+    Roles ||--o{ RolePermissions : "granted"
+    Permissions ||--o{ RolePermissions : "mapped"
+    Tender ||--o{ TenderWorkflowAssignments : "assigned stages"
+    Tender ||--o{ TenderWorkflowHistory : "stage history"
+    Tender ||--o{ TenderVerificationReviews : "document reviews"
+    Tender ||--o{ TenderShortfalls : "shortfalls"
+    TenderShortfalls ||--o{ TenderShortfallItems : "contains"
+    TenderShortfallItems ||--o{ TenderShortfallSubmissions : "submission history"
+    Tender ||--o{ TenderFinancialApprovals : "financial decisions"
+    Tender ||--o{ TenderGeneratedDocuments : "versioned outputs"
+    Tender ||--o{ TenderPublicationSchedule : "publication history"
+    Tender ||--o{ TenderExtensionRequests : "extension requests"
+    Tender ||--o{ TenderLifecycleHistory : "lifecycle audit"
+    Tender ||--o{ TenderBudgetOpinions : "budget opinions"
+    Tender ||--o{ TenderRequiredBidDocuments : "required bidder documents"
+    Tender ||--o{ TenderDocumentVerificationHistory : "verification history"
+    Tender ||--o{ TenderFinancialBidOpening : "financial opening"
+    TenderFinancialBidOpening ||--o{ TenderFinancialBidOpeningDetails : "opened bids"
+    FinancialBid ||--o{ TenderFinancialBidDocuments : "financial documents"
+    Tender ||--o{ TenderNotifications : "notifications"
+    TenderTypes ||--o{ Tender : "category"
+    Users ||--o{ AuditLog : "performs"
+    Users ||--o{ TenderWorkflowAssignments : "assigned officer"
 
     Roles {
         int RoleId PK
@@ -145,6 +171,36 @@ erDiagram
         string StageName
         int ApproverRoleId FK
     }
+    Permissions {
+        int PermissionId PK
+        string PermissionName
+    }
+    RolePermissions {
+        int RoleId PK, FK
+        int PermissionId PK, FK
+    }
+    TenderTypes {
+        string TypeName PK
+        int SortOrder
+        bit IsActive
+    }
+    TenderMethods {
+        string MethodName PK
+        int SortOrder
+        bit IsActive
+    }
+    TenderWorkflowHistory {
+        bigint HistoryId PK
+        int TenderId FK
+        string PreviousStatus
+        string NewStatus
+        int UserId FK
+    }
+    TenderSchemaMigrations {
+        string MigrationId PK
+        string Description
+        datetime AppliedAtUtc
+    }
 ```
 
 ## Notes
@@ -152,3 +208,11 @@ erDiagram
 - DepartmentModule applies the role/status transition rules in its Web Forms code-behind. The existing `WorkflowStages` table remains part of the shared schema and is reused by the legacy application; this module does not edit its contents.
 - `BOQ.Amount` is a computed, persisted column (`Quantity * Rate`).
 - Soft delete is used on `Tender` (`IsDeleted`) so the full workflow trail is never lost.
+- `Tender.TenderType` retains the historical procurement-method value; `Tender.TenderCategory`
+  references the separate category catalog in `TenderTypes`. New method values are maintained in
+  `TenderMethods`.
+- Verification, shortfall submissions, financial approvals, generated-document versions, and
+  workflow histories remain separate records so their responsible stages and audit evidence are
+  not collapsed into a single row.
+- No legacy business tables were merged or renamed. New setup objects are `Designations`,
+  `TenderMethods`, and `TenderSchemaMigrations`.

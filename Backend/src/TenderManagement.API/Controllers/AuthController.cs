@@ -16,23 +16,40 @@ namespace TenderManagement.API.Controllers
             _authService = authService;
         }
 
-        /// <summary>POST /api/auth/login</summary>
+        /// <summary>POST /api/auth/request-otp</summary>
+        [AllowAnonymous]
+        [HttpPost("request-otp")]
+        [ProducesResponseType(typeof(RequestLoginOtpResponseDto), StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> RequestOtp(
+            [FromBody] RequestLoginOtpRequestDto request, CancellationToken cancellationToken)
+        {
+            var result = await _authService.RequestLoginOtpAsync(request, cancellationToken);
+            return Accepted(result);
+        }
+
+        /// <summary>POST /api/auth/login verifies a one-time mobile code.</summary>
         [AllowAnonymous]
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+        [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> Login(
+            [FromBody] LoginRequestDto request, CancellationToken cancellationToken)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            var result = await _authService.LoginAsync(request);
+            var result = await _authService.LoginAsync(request, cancellationToken);
             return Ok(result);
         }
 
         /// <summary>POST /api/auth/register</summary>
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+        public async Task<IActionResult> Register(
+            [FromBody] RegisterRequestDto request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-            var result = await _authService.RegisterAsync(request);
+            var result = await _authService.RegisterAsync(request, cancellationToken);
             return Ok(result);
         }
     }

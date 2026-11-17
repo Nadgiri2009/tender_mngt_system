@@ -14,6 +14,7 @@ namespace DepartmentModule.Pages
         private const string PageIndexKey = "HomeTenderPageIndex";
         private const string PublicTenderFilter =
             " FROM dbo.Tender t INNER JOIN dbo.Departments d ON d.DepartmentId=t.DepartmentId " +
+            "INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId " +
             "WHERE t.IsDeleted=0 AND EXISTS " +
             "(SELECT 1 FROM dbo.ApprovalHistory ah WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published')";
 
@@ -41,9 +42,14 @@ namespace DepartmentModule.Pages
                 {
                     using (SqlCommand command = new SqlCommand(
                         @"SELECT
-                            (SELECT COUNT(*) FROM dbo.Tender WHERE IsDeleted=0 AND CurrentStatus IN
-                                (N'Tender Published',N'Technical Bid Opening',N'Technical Evaluation',N'Financial Bid Opening',N'CAFO Rate Opinion',N'Financial Evaluation',N'MCA Opinion')) AS ActiveTenders,
                             (SELECT COUNT(*) FROM dbo.Tender t
+                             INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
+                             WHERE t.IsDeleted=0 AND t.CurrentStatus IN
+                                (N'Tender Published',N'Technical Bid Opening',N'Technical Evaluation',N'Financial Bid Opening',N'CAFO Rate Opinion',N'Financial Evaluation',N'MCA Opinion')
+                               AND s.PublicationStartUtc<=SYSUTCDATETIME()
+                               AND s.CurrentClosingUtc>=SYSUTCDATETIME()) AS ActiveTenders,
+                            (SELECT COUNT(*) FROM dbo.Tender t
+                             INNER JOIN dbo.TenderPublicationSchedule s ON s.TenderId=t.TenderId
                              WHERE t.IsDeleted=0 AND EXISTS
                                 (SELECT 1 FROM dbo.ApprovalHistory ah
                                  WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published')) AS PublishedTenders,
@@ -88,11 +94,12 @@ namespace DepartmentModule.Pages
             int pageCount = Math.Max(1, (int)Math.Ceiling(count / (double)TendersPerPage));
             CurrentPage = Math.Max(1, Math.Min(CurrentPage, pageCount));
             using (SqlCommand command = new SqlCommand(
-                @"SELECT t.TenderId,t.TenderNumber,t.Title,t.TenderType,d.DepartmentName,
+                @"SELECT t.TenderId,t.TenderNumber,t.Title,t.TenderType,
+                         COALESCE(t.TenderCategory,N'Uncategorized') AS TenderCategory,d.DepartmentName,
                          (SELECT MIN(ah.ApprovalDate)
                           FROM dbo.ApprovalHistory ah
                           WHERE ah.TenderId=t.TenderId AND ah.NewStatus=N'Tender Published') AS PublicationDate,
-                         t.SubmissionStartDate,t.SubmissionDeadline,t.CurrentStatus" + PublicTenderFilter + @"
+                         s.PublicationStartUtc,s.CurrentClosingUtc,t.CurrentStatus" + PublicTenderFilter + @"
                   ORDER BY t.CreatedDate DESC,t.TenderId DESC
                   OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;", connection))
             {
@@ -102,6 +109,8 @@ namespace DepartmentModule.Pages
                 {
                     DataTable tenders = new DataTable();
                     adapter.Fill(tenders);
+                    TenderLifecycleFiles.ConvertDatesToIndia(
+                        tenders, "PublicationStartUtc", "CurrentClosingUtc");
                     TendersGrid.DataSource = tenders;
                     TendersGrid.DataBind();
                 }

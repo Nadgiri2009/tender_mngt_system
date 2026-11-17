@@ -1,18 +1,10 @@
-# EF Core Migrations
+# Database setup
 
-This folder intentionally ships empty. The database schema for this project is authored directly
-as SQL Server scripts in `/Database` (recommended — guarantees the schema matches exactly what's
-documented, including stored procedures, computed columns, and seed data).
+The application database is installed and upgraded only through the repository-root
+`SMC_TENDER_DATABASE.sql`. The `Migrations` folder has no active EF Core migrations. Do not follow
+the former `01_CreateDatabase_Schema.sql`, `02_StoredProcedures.sql`, or `03_SeedData.sql`
+instructions; those files are not part of the supported setup.
 
-If you'd rather drive the schema from the EF Core model instead of the SQL scripts, generate a
-migration once the solution restores successfully:
-
-```bash
-cd Backend/src/TenderManagement.API
-dotnet ef migrations add InitialCreate --project ../TenderManagement.Infrastructure --startup-project .
-dotnet ef database update --project ../TenderManagement.Infrastructure --startup-project .
-```
-
-Note: if you take this route, skip running `01_CreateDatabase_Schema.sql` (EF will create the
-tables for you) but still run `02_StoredProcedures.sql` and `03_SeedData.sql` afterwards, since
-those aren't part of the EF model.
+Use the SQLCMD Fresh mode only for a new, empty database. Use Upgrade mode only after a verified
+backup and a successful rehearsal on an isolated restored copy. See the repository-root
+`SMC_TENDER_MASTER_DOCUMENTATION.md` for commands, safeguards, and validation results.

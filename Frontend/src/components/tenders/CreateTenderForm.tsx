@@ -9,7 +9,7 @@ import { useState } from "react";
 
 import { createTenderSchema, type CreateTenderFormValues } from "@/lib/validations/tender";
 import { createTender } from "@/lib/api/tenders";
-import { fetchTenderTypes } from "@/lib/api/lookups";
+import { fetchTenderCategories, fetchTenderTypes } from "@/lib/api/lookups";
 import { ApiError } from "@/lib/api/client";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export function CreateTenderForm() {
       description: "",
       departmentId: user?.departmentId ?? undefined,
       tenderType: "",
+      tenderCategory: "",
       submissionStartDate: "",
       submissionDeadline: "",
     },
@@ -56,6 +57,7 @@ export function CreateTenderForm() {
           departmentId: values.departmentId,
           estimatedAmount: values.estimatedAmount,
           tenderType: values.tenderType,
+          tenderCategory: values.tenderCategory,
           submissionStartDate: values.submissionStartDate || undefined,
           submissionDeadline: values.submissionDeadline || undefined,
         },
@@ -73,10 +75,15 @@ export function CreateTenderForm() {
 
   const departmentValue = watch("departmentId");
   const tenderTypeValue = watch("tenderType");
+  const tenderCategoryValue = watch("tenderCategory");
 
   const { data: tenderTypes } = useQuery({
     queryKey: ["tender-types"],
     queryFn: fetchTenderTypes,
+  });
+  const { data: tenderCategories } = useQuery({
+    queryKey: ["tender-categories"],
+    queryFn: fetchTenderCategories,
   });
 
   return (
@@ -113,7 +120,7 @@ export function CreateTenderForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tenderType">Tender Type</Label>
+            <Label htmlFor="tenderType">Tender Method</Label>
             <Select
               value={tenderTypeValue}
               onValueChange={(v) => setValue("tenderType", v, { shouldValidate: true })}
@@ -130,6 +137,26 @@ export function CreateTenderForm() {
               </SelectContent>
             </Select>
             {errors.tenderType && <p className="text-sm text-destructive">{errors.tenderType.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tenderCategory">Tender Category</Label>
+            <Select
+              value={tenderCategoryValue}
+              onValueChange={(v) => setValue("tenderCategory", v, { shouldValidate: true })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select tender category" />
+              </SelectTrigger>
+              <SelectContent>
+                {tenderCategories?.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.tenderCategory && <p className="text-sm text-destructive">{errors.tenderCategory.message}</p>}
           </div>
 
           <div className="space-y-2">

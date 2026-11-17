@@ -32,6 +32,13 @@ namespace DepartmentModule.Pages
                 return;
             }
 
+            int technicalBidDocumentId = QueryId("technicalBidDocumentId");
+            if (technicalBidDocumentId > 0)
+            {
+                DownloadTechnicalBidChildDocument(technicalBidDocumentId);
+                return;
+            }
+
             int technicalBidId = QueryId("technicalBidId");
             if (technicalBidId > 0)
             {
@@ -232,6 +239,85 @@ namespace DepartmentModule.Pages
             SendStoredFile(storedPath, fileName);
         }
 
+        private void DownloadTechnicalBidChildDocument(int documentId)
+        {
+            bool isContractor = HasAnyRole("Contractor");
+            bool isSystemAdministrator = HasPermission("system.admin");
+            bool isAssignedReviewer = HasPermission("document.read.assigned");
+            bool isLegacyReviewer = HasAnyRole("TenderSection", "TenderCommittee", "CAFOOfficer");
+            if (CurrentUserId <= 0 ||
+                (!isContractor && !isSystemAdministrator && !isAssignedReviewer && !isLegacyReviewer))
+            {
+                NotFound();
+                return;
+            }
+
+            string storedPath, fileName;
+            try
+            {
+                using (SqlConnection connection = ModuleDb.OpenConnection())
+                using (SqlCommand command = new SqlCommand(
+                    @"SELECT d.FilePath,d.FileName
+                      FROM dbo.TechnicalBidDocuments d
+                      INNER JOIN dbo.TechnicalBid b ON b.TechnicalBidId=d.TechnicalBidId
+                      INNER JOIN dbo.Tender t ON t.TenderId=b.TenderId
+                      LEFT JOIN dbo.Contractors c ON c.ContractorId=b.ContractorId
+                      WHERE d.TechnicalBidDocumentId=@DocumentId AND t.IsDeleted=0
+                        AND
+                        (
+                            @IsSystemAdministrator=1
+                            OR (@IsContractor=1 AND c.UserId=@UserId)
+                            OR (@IsAssignedReviewer=1 AND t.WorkflowVersion=2 AND EXISTS
+                                (
+                                    SELECT 1
+                                    FROM dbo.TenderWorkflowAssignments a
+                                    INNER JOIN dbo.WorkflowStages s ON s.StageId=a.StageId
+                                        AND s.WorkflowVersion=2 AND s.IsActive=1
+                                    WHERE a.TenderId=t.TenderId AND a.IsCurrent=1
+                                      AND a.AssignedRoleId=@RoleId
+                                      AND (a.AssignedUserId IS NULL OR a.AssignedUserId=@UserId)
+                                      AND (@Role<>N'Junior Engineer (JE)'
+                                           OR (@DepartmentId IS NOT NULL AND a.DepartmentId=@DepartmentId
+                                               AND t.DepartmentId=@DepartmentId))
+                                ))
+                            OR (@IsLegacyReviewer=1 AND t.WorkflowVersion=1
+                                AND EXISTS(SELECT 1 FROM dbo.TenderBidOpening o WHERE o.TenderId=t.TenderId)
+                                AND (@Role=N'Admin' OR NOT EXISTS
+                                    (SELECT 1 FROM dbo.Users scopeUser
+                                     WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId IS NOT NULL)
+                                     OR EXISTS
+                                    (SELECT 1 FROM dbo.Users scopeUser
+                                     WHERE scopeUser.UserId=@UserId AND scopeUser.DepartmentId=t.DepartmentId)))
+                        );", connection))
+                {
+                    ModuleDb.AddParameter(command, "@DocumentId", SqlDbType.Int, documentId);
+                    ModuleDb.AddParameter(command, "@IsSystemAdministrator", SqlDbType.Bit, isSystemAdministrator);
+                    ModuleDb.AddParameter(command, "@IsContractor", SqlDbType.Bit, isContractor);
+                    ModuleDb.AddParameter(command, "@IsAssignedReviewer", SqlDbType.Bit, isAssignedReviewer);
+                    ModuleDb.AddParameter(command, "@IsLegacyReviewer", SqlDbType.Bit, isLegacyReviewer);
+                    ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, CurrentUserId);
+                    ModuleDb.AddParameter(command, "@RoleId", SqlDbType.Int, CurrentRoleId);
+                    AddText(command, "@Role", SqlDbType.NVarChar, CurrentRole, 50);
+                    ModuleDb.AddParameter(command, "@DepartmentId", SqlDbType.Int,
+                        CurrentDepartmentId.HasValue ? (object)CurrentDepartmentId.Value : null);
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (!reader.Read()) { NotFound(); return; }
+                        storedPath = Convert.ToString(reader["FilePath"]);
+                        fileName = TenderLifecycleFiles.SafeFileName(Convert.ToString(reader["FileName"]));
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                Trace.Warn("DepartmentModule", "Bid document metadata could not be read.", ex);
+                Response.StatusCode = 500;
+                Context.ApplicationInstance.CompleteRequest();
+                return;
+            }
+            SendStoredFile(storedPath, fileName);
+        }
+
         private void SendStoredFile(string storedPath, string fileName)
         {
             string normalized = (storedPath ?? String.Empty).Replace('\\', '/').TrimStart('/');
@@ -255,9 +341,21 @@ namespace DepartmentModule.Pages
 
             Response.Clear();
             Response.ContentType = MimeType(Path.GetExtension(fileName));
-            Response.AddHeader("Content-Disposition", "attachment; filename=\"" + fileName.Replace("\"", String.Empty) + "\"");
+            string disposition = IsInlinePreviewRequested(fileName) ? "inline" : "attachment";
+            Response.AddHeader("Content-Disposition", disposition + "; filename=\"" + fileName.Replace("\"", String.Empty) + "\"");
             Response.TransmitFile(path);
             Context.ApplicationInstance.CompleteRequest();
+        }
+
+        private bool IsInlinePreviewRequested(string fileName)
+        {
+            if (!String.Equals(Request.QueryString["preview"], "true", StringComparison.OrdinalIgnoreCase))
+                return false;
+            string extension = Path.GetExtension(fileName);
+            return String.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string MimeType(string extension)

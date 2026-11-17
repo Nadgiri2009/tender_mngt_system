@@ -4,7 +4,9 @@ namespace TenderManagement.Application.Interfaces
 {
     public interface IAuthService
     {
-        Task<AuthResponseDto> LoginAsync(LoginRequestDto request);
-        Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request);
+        Task<RequestLoginOtpResponseDto> RequestLoginOtpAsync(
+            RequestLoginOtpRequestDto request, CancellationToken cancellationToken);
+        Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken);
+        Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request, CancellationToken cancellationToken);
     }
 }

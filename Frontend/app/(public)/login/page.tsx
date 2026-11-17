@@ -10,7 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
 
-import { login as loginApi } from "@/lib/api/auth";
+import { login as loginApi, requestLoginOtp } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { getAuthReturnUrl } from "@/lib/authRedirect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,25 +20,48 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+const mobileSchema = z.object({
+  mobile: z.string().trim().min(10, "Enter a valid mobile number").max(18, "Enter a valid mobile number"),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+const otpSchema = z.object({
+  otp: z.string().regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+
+type MobileFormValues = z.infer<typeof mobileSchema>;
+type OtpFormValues = z.infer<typeof otpSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
   const { setSession } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [activeMobile, setActiveMobile] = useState("");
+  const [step, setStep] = useState<"mobile" | "otp">("mobile");
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+  const mobileForm = useForm<MobileFormValues>({
+    resolver: zodResolver(mobileSchema),
+    defaultValues: { mobile: "" },
+  });
+  const otpForm = useForm<OtpFormValues>({
+    resolver: zodResolver(otpSchema),
+    defaultValues: { otp: "" },
+  });
 
-  const mutation = useMutation({
+  const requestOtpMutation = useMutation({
+    mutationFn: requestLoginOtp,
+    onSuccess: (response, input) => {
+      setActiveMobile(input.mobile);
+      setStep("otp");
+      otpForm.reset();
+      setServerError(null);
+      toast.success(response.message);
+    },
+    onError: (error: ApiError) => {
+      setServerError(error.message || "Could not request a sign-in code.");
+    },
+  });
+
+  const loginMutation = useMutation({
     mutationFn: loginApi,
     onSuccess: (auth) => {
       setSession(auth);
@@ -48,6 +71,16 @@ export default function LoginPage() {
     onError: (error: ApiError) => {
       setServerError(error.message || "Login failed.");
     },
+  });
+
+  const requestCode = mobileForm.handleSubmit((values) => {
+    setServerError(null);
+    requestOtpMutation.mutate(values);
+  });
+
+  const verifyCode = otpForm.handleSubmit((values) => {
+    setServerError(null);
+    loginMutation.mutate({ mobile: activeMobile, otp: values.otp });
   });
 
   return (
@@ -61,30 +94,84 @@ export default function LoginPage() {
           <CardDescription>Solapur Municipal Corporation Tender Portal</CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            className="space-y-4"
-            onSubmit={handleSubmit((values) => {
-              setServerError(null);
-              mutation.mutate(values);
-            })}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" {...register("email")} />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
-              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-            </div>
+          {step === "mobile" ? (
+            <form className="space-y-4" onSubmit={requestCode}>
+              <div className="space-y-2">
+                <Label htmlFor="mobile">Mobile number</Label>
+                <Input
+                  id="mobile"
+                  type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  {...mobileForm.register("mobile")}
+                />
+                {mobileForm.formState.errors.mobile && (
+                  <p className="text-sm text-destructive">{mobileForm.formState.errors.mobile.message}</p>
+                )}
+              </div>
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+              {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting || mutation.isPending}>
-              {mutation.isPending ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
+              <Button type="submit" className="w-full" disabled={requestOtpMutation.isPending}>
+                {requestOtpMutation.isPending ? "Requesting code..." : "Send sign-in code"}
+              </Button>
+            </form>
+          ) : (
+            <form className="space-y-4" onSubmit={verifyCode}>
+              <div className="space-y-2">
+                <Label htmlFor="active-mobile">Mobile number</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <p id="active-mobile" className="text-sm text-muted-foreground">{activeMobile}</p>
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-primary hover:underline"
+                    onClick={() => {
+                      setServerError(null);
+                      setStep("mobile");
+                      otpForm.reset();
+                    }}
+                  >
+                    Change number
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="otp">6-digit sign-in code</Label>
+                <Input
+                  id="otp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  {...otpForm.register("otp")}
+                />
+                {otpForm.formState.errors.otp && (
+                  <p className="text-sm text-destructive">{otpForm.formState.errors.otp.message}</p>
+                )}
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                If this number is registered, use the code sent to it. In local development, check the API console.
+              </p>
+              {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+
+              <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                {loginMutation.isPending ? "Verifying..." : "Verify and sign in"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={requestOtpMutation.isPending}
+                onClick={() => {
+                  setServerError(null);
+                  requestOtpMutation.mutate({ mobile: activeMobile });
+                }}
+              >
+                {requestOtpMutation.isPending ? "Requesting code..." : "Resend code"}
+              </Button>
+            </form>
+          )}
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
             New vendor?{" "}
