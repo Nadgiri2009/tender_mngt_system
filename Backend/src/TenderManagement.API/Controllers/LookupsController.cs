@@ -1,15 +1,12 @@
-using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TenderManagement.Domain.Enums;
 using TenderManagement.Infrastructure.Data;
 
 namespace TenderManagement.API.Controllers
 {
     /// <summary>
-    /// Exposes read-only option lists that are defined once, in the Domain enums, so the
-    /// frontend never needs to hand-maintain a duplicate copy of TenderStatus / TenderType.
+    /// Exposes read-only options configured in the database.
     /// </summary>
     [ApiController]
     [Route("api/lookups")]
@@ -25,7 +22,16 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/lookups/tender-statuses</summary>
         [HttpGet("tender-statuses")]
-        public IActionResult GetTenderStatuses() => Ok(GetConstStringValues(typeof(TenderStatus)));
+        public async Task<IActionResult> GetTenderStatuses(CancellationToken cancellationToken)
+        {
+            var activeTransitions = _context.WorkflowTransitions.AsNoTracking()
+                .Where(transition => transition.IsActive && transition.WorkflowVersion == 2)
+                .Select(transition => transition.FromStatus)
+                .Union(_context.WorkflowTransitions.AsNoTracking()
+                    .Where(transition => transition.IsActive && transition.WorkflowVersion == 2)
+                    .Select(transition => transition.ToStatus));
+            return Ok(await activeTransitions.OrderBy(status => status).ToListAsync(cancellationToken));
+        }
 
         /// <summary>GET /api/lookups/tender-types returns active procurement methods.</summary>
         [HttpGet("tender-types")]
@@ -55,12 +61,14 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/lookups/role-names</summary>
         [HttpGet("role-names")]
-        public IActionResult GetRoleNames() => Ok(GetConstStringValues(typeof(RoleNames)));
-
-        private static List<string> GetConstStringValues(Type type) =>
-            type.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
-                .Where(f => f.IsLiteral && !f.IsInitOnly && f.FieldType == typeof(string))
-                .Select(f => (string)f.GetRawConstantValue()!)
-                .ToList();
+        public async Task<IActionResult> GetRoleNames(CancellationToken cancellationToken)
+        {
+            var roles = await _context.Roles.AsNoTracking()
+                .Where(role => role.IsActive)
+                .OrderBy(role => role.RoleCode)
+                .Select(role => new { role.RoleCode, role.RoleName })
+                .ToListAsync(cancellationToken);
+            return Ok(roles);
+        }
     }
 }

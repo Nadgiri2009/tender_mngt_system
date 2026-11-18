@@ -7,10 +7,11 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { TenderTable } from "@/components/tenders/TenderTable";
 import { useAuth } from "@/contexts/AuthContext";
+import { ROLE_NAMES } from "@/types/auth";
 
 export default function TendersPage() {
   const { user, isLoading } = useAuth();
-  const canCreateTender = user?.role === "Admin" || user?.role === "DepartmentOfficer";
+  const canCreateTender = user?.role === ROLE_NAMES.JuniorEngineer;
 
   return (
     <main className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">

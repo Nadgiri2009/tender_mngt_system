@@ -22,6 +22,27 @@ namespace TenderManagement.Application.DTOs.Tender
         [Required, StringLength(50)]
         public string TenderCategory { get; set; } = string.Empty;
 
+        [StringLength(4000)]
+        public string? BudgetInformation { get; set; }
+
+        [StringLength(200)]
+        public string? TechnicalSanctionNumber { get; set; }
+
+        [StringLength(400)]
+        public string? TechnicalSanctionAuthority { get; set; }
+
+        public DateTime? TechnicalSanctionDate { get; set; }
+
+        public DateTime? PreBidMeetingUtc { get; set; }
+
+        [StringLength(600)]
+        public string? PreBidLocation { get; set; }
+
+        [StringLength(4000)]
+        public string? PreBidDetails { get; set; }
+
+        public DateTime? TechnicalBidOpeningScheduledUtc { get; set; }
+
         public DateTime? SubmissionStartDate { get; set; }
 
         public DateTime? SubmissionDeadline { get; set; }
@@ -43,6 +64,27 @@ namespace TenderManagement.Application.DTOs.Tender
 
         [Required, StringLength(50)]
         public string TenderCategory { get; set; } = string.Empty;
+
+        [StringLength(4000)]
+        public string? BudgetInformation { get; set; }
+
+        [StringLength(200)]
+        public string? TechnicalSanctionNumber { get; set; }
+
+        [StringLength(400)]
+        public string? TechnicalSanctionAuthority { get; set; }
+
+        public DateTime? TechnicalSanctionDate { get; set; }
+
+        public DateTime? PreBidMeetingUtc { get; set; }
+
+        [StringLength(600)]
+        public string? PreBidLocation { get; set; }
+
+        [StringLength(4000)]
+        public string? PreBidDetails { get; set; }
+
+        public DateTime? TechnicalBidOpeningScheduledUtc { get; set; }
 
         public DateTime? SubmissionDeadline { get; set; }
     }

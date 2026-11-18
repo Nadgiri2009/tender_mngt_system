@@ -1,18 +1,24 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AuthResponse, AuthUser } from "@/types/auth";
-
-const TOKEN_KEY = "tms_access_token";
-const USER_KEY = "tms_user";
+import {
+  AUTH_UNAUTHORIZED_EVENT,
+  clearAuthSession,
+  getStoredExpiry,
+  getStoredToken,
+  getStoredUser,
+  getTokenExpiry,
+  saveStoredSession,
+} from "@/lib/authSession";
 
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  setSession: (auth: AuthResponse) => void;
+  setSession: (auth: AuthResponse) => boolean;
   logout: () => void;
 }
 
@@ -22,47 +28,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(USER_KEY);
-    const token = window.localStorage.getItem(TOKEN_KEY);
-    if (stored && token) {
+    const stored = getStoredUser();
+    const token = getStoredToken();
+    const expiresAt = getStoredExpiry();
+
+    if (stored && token && expiresAt > Date.now()) {
       try {
-        setUser(JSON.parse(stored));
+        const parsed: unknown = JSON.parse(stored);
+        if (isAuthUser(parsed)) {
+          setUser(parsed);
+        } else {
+          clearAuthSession();
+        }
       } catch {
-        window.localStorage.removeItem(USER_KEY);
-        window.localStorage.removeItem(TOKEN_KEY);
+        clearAuthSession();
       }
+    } else {
+      clearAuthSession();
     }
     setIsLoading(false);
   }, []);
 
   const setSession = useCallback((auth: AuthResponse) => {
+    const expiresAt = getTokenExpiry(auth.token, auth.expiresAt);
+    if (!auth.token || !expiresAt) {
+      clearAuthSession();
+      setUser(null);
+      return false;
+    }
+
     const authUser: AuthUser = {
       userId: auth.userId,
       fullName: auth.fullName,
       email: auth.email,
       role: auth.role,
+      accountType: auth.accountType,
       departmentId: auth.departmentId,
     };
-    window.localStorage.setItem(TOKEN_KEY, auth.token);
-    window.localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+    saveStoredSession(auth.token, authUser, expiresAt);
     setUser(authUser);
+    return true;
   }, []);
 
   const logout = useCallback(() => {
-    window.localStorage.removeItem(TOKEN_KEY);
-    window.localStorage.removeItem(USER_KEY);
+    clearAuthSession();
     queryClient.clear();
     setUser(null);
     router.replace("/");
   }, [queryClient, router]);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      const hadSession = !!user || !!getStoredUser();
+      clearAuthSession();
+      queryClient.clear();
+      setUser(null);
+
+      if (hadSession && !pathname.startsWith("/login") && !pathname.startsWith("/register")) {
+        router.replace("/login");
+      }
+    };
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+  }, [pathname, queryClient, router, user]);
+
   return (
     <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, setSession, logout }}>
       {children}
     </AuthContext.Provider>
+  );
+}
+
+function isAuthUser(value: unknown): value is AuthUser {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.userId === "number" &&
+    typeof candidate.fullName === "string" &&
+    typeof candidate.email === "string" &&
+    typeof candidate.role === "string" &&
+    typeof candidate.accountType === "string" &&
+    (candidate.departmentId === null || typeof candidate.departmentId === "number")
   );
 }
 

@@ -32,9 +32,11 @@ namespace TenderManagement.Infrastructure.Services
                 new(ClaimTypes.Name, user.FullName),
                 new(ClaimTypes.Email, user.Email),
                 new(ClaimTypes.Role, roleName),
-                new("roleId", user.RoleId.ToString()),
+                new("accountType", user.AccountType),
                 new("departmentId", user.DepartmentId?.ToString() ?? string.Empty)
             };
+            if (user.RoleId.HasValue)
+                claims.Add(new Claim("roleId", user.RoleId.Value.ToString()));
 
             var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);

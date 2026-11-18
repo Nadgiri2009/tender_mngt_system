@@ -4,26 +4,25 @@ using TenderManagement.Application.Interfaces;
 
 namespace TenderManagement.API.Services
 {
-    public sealed class DevelopmentConsoleOtpDeliveryService : IAuthOtpDeliveryService
+    public sealed class DevelopmentOtpDeliveryService : IAuthOtpDeliveryService
     {
         private readonly IWebHostEnvironment _environment;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ILogger<DevelopmentConsoleOtpDeliveryService> _logger;
 
-        public DevelopmentConsoleOtpDeliveryService(
+        public DevelopmentOtpDeliveryService(
             IWebHostEnvironment environment,
-            IHttpContextAccessor httpContextAccessor,
-            ILogger<DevelopmentConsoleOtpDeliveryService> logger)
+            IHttpContextAccessor httpContextAccessor)
         {
             _environment = environment;
             _httpContextAccessor = httpContextAccessor;
-            _logger = logger;
         }
 
         public bool IsAvailable =>
             _environment.IsDevelopment() &&
             _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress is { } remoteIp &&
             IPAddress.IsLoopback(remoteIp.IsIPv4MappedToIPv6 ? remoteIp.MapToIPv4() : remoteIp);
+
+        public bool CanExposeOtp => IsAvailable;
 
         public Task SendAsync(string mobile, string code, CancellationToken cancellationToken)
         {
@@ -33,10 +32,6 @@ namespace TenderManagement.API.Services
                 throw new OtpDeliveryUnavailableException();
             }
 
-            _logger.LogInformation(
-                "Development sign-in OTP for mobile ending {MobileSuffix}: {OtpCode}",
-                mobile[^4..],
-                code);
             return Task.CompletedTask;
         }
     }

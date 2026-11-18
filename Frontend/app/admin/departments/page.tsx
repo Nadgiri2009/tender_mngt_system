@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,11 +9,13 @@ import { toast } from "sonner";
 import { Plus, Building2, Pencil, Trash2, Search, FileWarning } from "lucide-react";
 
 import { ApiError } from "@/lib/api/client";
-import { createDepartment, deleteDepartment, fetchDepartments, updateDepartment } from "@/lib/api/departments";
+import { createDepartment, deleteDepartment, fetchAdminDepartments, updateDepartment } from "@/lib/api/departments";
 import type { Department } from "@/types/tender";
 import { formatDate } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { PaginationControls } from "@/components/layout/PaginationControls";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,7 @@ const departmentSchema = z.object({
 });
 type DepartmentFormValues = z.infer<typeof departmentSchema>;
 
-const pageSize = 8;
+const pageSize = 10;
 
 export default function AdminDepartmentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -48,23 +50,13 @@ export default function AdminDepartmentsPage() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["departments"],
-    queryFn: fetchDepartments,
+  const debouncedSearch = useDebouncedValue(search, 350);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["admin-departments", debouncedSearch, pageNumber, pageSize],
+    queryFn: () => fetchAdminDepartments({ search: debouncedSearch, pageNumber, pageSize }),
   });
-
-  const filteredDepartments = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const departments = data ?? [];
-    if (!term) return departments;
-    return departments.filter((dept) => {
-      const haystack = `${dept.departmentName} ${dept.departmentCode ?? ""} ${dept.headOfficerName ?? ""}`.toLowerCase();
-      return haystack.includes(term);
-    });
-  }, [data, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredDepartments.length / pageSize));
-  const visibleDepartments = filteredDepartments.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
+  const departments = data?.items ?? [];
 
   const {
     register,
@@ -105,6 +97,7 @@ export default function AdminDepartmentsPage() {
     onSuccess: () => {
       toast.success(editingDepartment ? "Department updated." : "Department added.");
       queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
       setDialogOpen(false);
       setEditingDepartment(null);
       reset();
@@ -118,12 +111,13 @@ export default function AdminDepartmentsPage() {
     onSuccess: (result) => {
       toast.success(result.message || "Department disabled.");
       queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
     },
     onError: (error: ApiError) => toast.error(error.message || "Failed to delete department."),
   });
 
   const onDelete = (department: Department) => {
-    if (!window.confirm(`Disable ${department.departmentName} and keep it from active use?`)) return;
+    if (!window.confirm(`Delete ${department.departmentName} if it has no linked records? Linked departments will be deactivated instead.`)) return;
     deleteMutation.mutate(department.departmentId);
   };
 
@@ -179,15 +173,15 @@ export default function AdminDepartmentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {!filteredDepartments.length && (
+                  {!departments.length && (
                     <TableRow>
                       <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                        No departments found.
+                        No departments match your search.
                       </TableCell>
                     </TableRow>
                   )}
 
-                  {visibleDepartments.map((dept, index) => (
+                  {departments.map((dept, index) => (
                     <TableRow key={dept.departmentId}>
                       <TableCell>{(pageNumber - 1) * pageSize + index + 1}</TableCell>
                       <TableCell className="font-medium">{dept.departmentName}</TableCell>
@@ -201,10 +195,10 @@ export default function AdminDepartmentsPage() {
                       <TableCell>{formatDate(dept.createdDate)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="icon" onClick={() => openEditDialog(dept)} aria-label="Edit department">
+                          <Button variant="outline" size="icon" onClick={() => openEditDialog(dept)} aria-label="Edit department" title="Edit department">
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" onClick={() => onDelete(dept)} aria-label="Delete department" className="text-destructive">
+                          <Button variant="outline" size="icon" onClick={() => onDelete(dept)} aria-label="Delete department" title="Delete or deactivate department" className="text-destructive">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -218,19 +212,16 @@ export default function AdminDepartmentsPage() {
         </CardContent>
       </Card>
 
-      {filteredDepartments.length > pageSize && (
-        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-          <p>
-            Page {pageNumber} of {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={pageNumber <= 1} onClick={() => setPageNumber((p) => Math.max(1, p - 1))}>
-              Prev
-            </Button>
-            <Button variant="outline" size="sm" disabled={pageNumber >= totalPages} onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}>
-              Next
-            </Button>
-          </div>
+      {isError && <p className="mt-2 text-sm text-destructive">{error instanceof Error ? error.message : "Could not load departments."}</p>}
+      {data && (
+        <div className="mt-4">
+          <PaginationControls
+            pageNumber={data.pageNumber}
+            pageSize={data.pageSize}
+            totalCount={data.totalCount}
+            totalPages={data.totalPages}
+            onPageChange={setPageNumber}
+          />
         </div>
       )}
 

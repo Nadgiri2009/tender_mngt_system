@@ -3,6 +3,7 @@ import type {
   AuthResponse,
   LoginInput,
   RegisterInput,
+  RegisterResponse,
   RequestLoginOtpInput,
   RequestLoginOtpResponse,
 } from "@/types/auth";
@@ -28,9 +29,9 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
 }
 
 // POST /api/auth/register
-export async function register(input: RegisterInput): Promise<AuthResponse> {
+export async function register(input: RegisterInput): Promise<RegisterResponse> {
   try {
-    const { data } = await apiClient.post<AuthResponse>("/auth/register", input);
+    const { data } = await apiClient.post<RegisterResponse>("/auth/register", input);
     return data;
   } catch (error) {
     throw toApiError(error);

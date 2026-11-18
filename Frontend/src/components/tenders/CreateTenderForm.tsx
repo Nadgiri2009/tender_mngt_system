@@ -22,12 +22,22 @@ import { DepartmentSelect } from "@/components/tenders/DepartmentSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_NAMES } from "@/types/auth";
 
+const allowedExtensions = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png"]);
+const maxFileSizeBytes = 50_000_000;
+
+function toUtcIso(value?: string) {
+  return value ? new Date(value).toISOString() : undefined;
+}
+
 export function CreateTenderForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isDepartmentOfficer = user?.role === ROLE_NAMES.DepartmentOfficer;
+  const isMainAdmin = user?.role === ROLE_NAMES.JuniorEngineer;
   const [files, setFiles] = useState<File[]>([]);
+  const [preBidDocument, setPreBidDocument] = useState<File>();
+  const [preBidError, setPreBidError] = useState<string>();
+  const [attachmentError, setAttachmentError] = useState<string>();
 
   const {
     register,
@@ -58,15 +68,24 @@ export function CreateTenderForm() {
           estimatedAmount: values.estimatedAmount,
           tenderType: values.tenderType,
           tenderCategory: values.tenderCategory,
-          submissionStartDate: values.submissionStartDate || undefined,
-          submissionDeadline: values.submissionDeadline || undefined,
+          budgetInformation: values.budgetInformation || undefined,
+          technicalSanctionNumber: values.technicalSanctionNumber || undefined,
+          technicalSanctionAuthority: values.technicalSanctionAuthority || undefined,
+          technicalSanctionDate: values.technicalSanctionDate || undefined,
+          preBidMeetingUtc: toUtcIso(values.preBidMeetingUtc),
+          preBidLocation: values.preBidLocation || undefined,
+          preBidDetails: values.preBidDetails || undefined,
+          technicalBidOpeningScheduledUtc: toUtcIso(values.technicalBidOpeningScheduledUtc),
+          submissionStartDate: toUtcIso(values.submissionStartDate),
+          submissionDeadline: toUtcIso(values.submissionDeadline),
         },
-        files
+        files,
+        preBidDocument
       ),
     onSuccess: (tender) => {
       toast.success(`Tender ${tender.tenderNumber} created as Draft.`);
       queryClient.invalidateQueries({ queryKey: ["tenders"] });
-      router.push(`/tenders/${tender.tenderId}`);
+      router.push("/tenders");
     },
     onError: (error: ApiError) => {
       toast.error(error.message || "Failed to create tender.");
@@ -93,7 +112,14 @@ export function CreateTenderForm() {
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={handleSubmit((values) => mutation.mutate(values))}
+          onSubmit={handleSubmit((values) => {
+            if (values.preBidMeetingUtc && !preBidDocument) {
+              setPreBidError("Upload the pre-bid meeting suggestion when a meeting is scheduled.");
+              return;
+            }
+            if (attachmentError) return;
+            mutation.mutate(values);
+          })}
           className="grid grid-cols-1 gap-6 sm:grid-cols-2"
         >
           <div className="sm:col-span-2 space-y-2">
@@ -113,9 +139,8 @@ export function CreateTenderForm() {
             <DepartmentSelect
               value={departmentValue ? String(departmentValue) : ""}
               onChange={(v) => setValue("departmentId", Number(v), { shouldValidate: true })}
-              disabled={isDepartmentOfficer}
             />
-            {isDepartmentOfficer && <p className="text-xs text-muted-foreground">Your assigned department is selected automatically.</p>}
+            {isMainAdmin && <p className="text-xs text-muted-foreground">As Main Admin, you can create tenders for any active department.</p>}
             {errors.departmentId && <p className="text-sm text-destructive">{errors.departmentId.message}</p>}
           </div>
 
@@ -174,6 +199,28 @@ export function CreateTenderForm() {
             )}
           </div>
 
+          <div className="sm:col-span-2 space-y-2">
+            <Label htmlFor="budgetInformation">Budget Details</Label>
+            <Textarea id="budgetInformation" rows={3} {...register("budgetInformation")} />
+            {errors.budgetInformation && <p className="text-sm text-destructive">{errors.budgetInformation.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="technicalSanctionNumber">Technical Sanction Number</Label>
+            <Input id="technicalSanctionNumber" {...register("technicalSanctionNumber")} />
+            {errors.technicalSanctionNumber && <p className="text-sm text-destructive">{errors.technicalSanctionNumber.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="technicalSanctionAuthority">Technical Sanction Authority</Label>
+            <Input id="technicalSanctionAuthority" {...register("technicalSanctionAuthority")} />
+            {errors.technicalSanctionAuthority && <p className="text-sm text-destructive">{errors.technicalSanctionAuthority.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="technicalSanctionDate">Technical Sanction Date</Label>
+            <Input id="technicalSanctionDate" type="date" {...register("technicalSanctionDate")} />
+            {errors.technicalSanctionDate && <p className="text-sm text-destructive">{errors.technicalSanctionDate.message}</p>}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="submissionStartDate">Application Start Date</Label>
             <Input id="submissionStartDate" type="datetime-local" {...register("submissionStartDate")} />
@@ -190,17 +237,88 @@ export function CreateTenderForm() {
             )}
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="technicalBidOpeningScheduledUtc">Technical Bid Opening</Label>
+            <Input
+              id="technicalBidOpeningScheduledUtc"
+              type="datetime-local"
+              {...register("technicalBidOpeningScheduledUtc")}
+            />
+            {errors.technicalBidOpeningScheduledUtc && (
+              <p className="text-sm text-destructive">{errors.technicalBidOpeningScheduledUtc.message}</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-2 space-y-4 rounded-md border p-4">
+            <p className="text-sm font-medium">Pre-bid Meeting (optional)</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="preBidMeetingUtc">Meeting Date and Time</Label>
+                <Input id="preBidMeetingUtc" type="datetime-local" {...register("preBidMeetingUtc")} />
+                {errors.preBidMeetingUtc && <p className="text-sm text-destructive">{errors.preBidMeetingUtc.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="preBidLocation">Meeting Location</Label>
+                <Input id="preBidLocation" {...register("preBidLocation")} />
+                {errors.preBidLocation && <p className="text-sm text-destructive">{errors.preBidLocation.message}</p>}
+              </div>
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="preBidDetails">Meeting Details</Label>
+                <Textarea id="preBidDetails" rows={3} {...register("preBidDetails")} />
+                {errors.preBidDetails && <p className="text-sm text-destructive">{errors.preBidDetails.message}</p>}
+              </div>
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="preBidDocument">Pre-bid Meeting Suggestion / Upload</Label>
+                <Input
+                  id="preBidDocument"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file && (file.size <= 0 || file.size > maxFileSizeBytes ||
+                      !allowedExtensions.has(file.name.slice(file.name.lastIndexOf(".")).toLowerCase()))) {
+                      setPreBidDocument(undefined);
+                      setPreBidError("Choose a supported document type no larger than 50 MB.");
+                      return;
+                    }
+                    setPreBidDocument(file);
+                    setPreBidError(undefined);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Required when a pre-bid meeting is scheduled. Maximum file size: 50 MB.
+                </p>
+                {preBidError && <p className="text-sm text-destructive">{preBidError}</p>}
+              </div>
+            </div>
+          </div>
+
           <div className="sm:col-span-2 space-y-2">
             <Label htmlFor="files">Attachments</Label>
             <Input
               id="files"
               type="file"
               multiple
-              onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+              onChange={(event) => {
+                const selectedFiles = event.target.files ? Array.from(event.target.files) : [];
+                const invalidFile = selectedFiles.find((file) =>
+                  file.size <= 0 || file.size > maxFileSizeBytes ||
+                  !allowedExtensions.has(file.name.slice(file.name.lastIndexOf(".")).toLowerCase())
+                );
+                if (invalidFile) {
+                  setFiles([]);
+                  setAttachmentError(`${invalidFile.name} must be a supported document type no larger than 50 MB.`);
+                  return;
+                }
+                setFiles(selectedFiles);
+                setAttachmentError(undefined);
+              }}
             />
             <p className="text-xs text-muted-foreground">
               Optional. Attach requirement notes, drawings, or supporting documents.
             </p>
+            {attachmentError && <p className="text-sm text-destructive">{attachmentError}</p>}
           </div>
 
           <div className="sm:col-span-2 flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">

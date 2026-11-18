@@ -1,11 +1,5 @@
 import axios, { AxiosError } from "axios";
-
-const TOKEN_STORAGE_KEY = "tms_access_token";
-
-export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
-}
+import { expireStoredSession, getStoredToken } from "@/lib/authSession";
 
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5050/api",
@@ -21,6 +15,16 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      expireStoredSession();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Matches the JSON shape written by Backend/.../Middleware/GlobalExceptionMiddleware.cs:
 // { success: false, statusCode: number, message: string }

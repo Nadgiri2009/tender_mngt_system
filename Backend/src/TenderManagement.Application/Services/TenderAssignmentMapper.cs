@@ -11,17 +11,6 @@ namespace TenderManagement.Application.Services
         }
 
         public static string GetAssignedRole(string currentStatus)
-        {
-            if (!WorkflowEngine.Transitions.TryGetValue(currentStatus, out var transition))
-            {
-                return "No pending role";
-            }
-
-            var roles = transition.ApproverRoles.Length > 0
-                ? transition.ApproverRoles
-                : transition.SubmitRoles;
-
-            return roles.Length > 0 ? string.Join(", ", roles) : "No pending role";
-        }
+            => "Configured by workflow";
     }
 }

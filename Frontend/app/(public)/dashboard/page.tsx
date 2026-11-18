@@ -35,15 +35,15 @@ const ROLE_DASHBOARDS: Record<string, {
   primaryLabel: string;
   primaryIcon: typeof Plus;
 }> = {
-  [ROLE_NAMES.DepartmentOfficer]: {
-    title: "Department Dashboard",
-    description: "Prepare, submit, and monitor tenders owned by your department.",
+  [ROLE_NAMES.JuniorEngineer]: {
+    title: "Junior Engineer Dashboard",
+    description: "Publish tenders, manage pre-bill and measurement details, open and close tenders, and create work orders and agreements.",
     focus: "Department work queue",
     primaryHref: "/tenders/new",
     primaryLabel: "New Tender",
     primaryIcon: Plus,
   },
-  [ROLE_NAMES.Contractor]: {
+  [ROLE_NAMES.ExternalBidder]: {
     title: "Contractor Dashboard",
     description: "Track your tender participation and submitted work.",
     focus: "Contractor activity",
@@ -51,68 +51,28 @@ const ROLE_DASHBOARDS: Record<string, {
     primaryLabel: "Browse Tenders",
     primaryIcon: BriefcaseBusiness,
   },
-  [ROLE_NAMES.TenderSection]: {
-    title: "Tender Section Dashboard",
-    description: "Manage tender processing, evaluation, and publication stages.",
-    focus: "Tender processing queue",
+  [ROLE_NAMES.TenderCell]: {
+    title: "Tender Cell Dashboard",
+    description: "Verify tender documents, approve document requirements, and manage shortfalls.",
+    focus: "Document verification queue",
     primaryHref: "/approvals",
-    primaryLabel: "Open Work Queue",
+    primaryLabel: "Open Verification Queue",
     primaryIcon: ClipboardCheck,
   },
-  [ROLE_NAMES.TenderCommittee]: {
-    title: "Tender Committee Dashboard",
-    description: "Review committee actions and monitor tender progress.",
-    focus: "Committee review queue",
+  [ROLE_NAMES.TenderCommitteeChairman]: {
+    title: "Tender Committee Chairman Dashboard",
+    description: "Approve financial bid opening when a tender is ready.",
+    focus: "Financial bid opening approvals",
     primaryHref: "/approvals",
-    primaryLabel: "Review Tenders",
+    primaryLabel: "Review Opening Requests",
     primaryIcon: ClipboardCheck,
   },
-  [ROLE_NAMES.TechnicalSanctionOfficer]: {
-    title: "Technical Sanction Dashboard",
-    description: "Review tenders waiting for technical sanction.",
-    focus: "Technical review queue",
+  [ROLE_NAMES.DirectorAuditor]: {
+    title: "Director Auditor Dashboard",
+    description: "Review and approve financial bid results after the Chairman authorizes opening.",
+    focus: "Financial review queue",
     primaryHref: "/approvals",
-    primaryLabel: "Review Approvals",
-    primaryIcon: ClipboardCheck,
-  },
-  [ROLE_NAMES.GBOfficer]: {
-    title: "GB Officer Dashboard",
-    description: "Review tenders waiting for GB approval.",
-    focus: "GB approval queue",
-    primaryHref: "/approvals",
-    primaryLabel: "Review Approvals",
-    primaryIcon: ClipboardCheck,
-  },
-  [ROLE_NAMES.DPDCOfficer]: {
-    title: "DPDC Dashboard",
-    description: "Review tenders waiting for administrative approval.",
-    focus: "Administrative review queue",
-    primaryHref: "/approvals",
-    primaryLabel: "Review Approvals",
-    primaryIcon: ClipboardCheck,
-  },
-  [ROLE_NAMES.CAFOOfficer]: {
-    title: "CAFO Dashboard",
-    description: "Review finance-related tender decisions and approvals.",
-    focus: "Finance approval queue",
-    primaryHref: "/approvals",
-    primaryLabel: "Review Approvals",
-    primaryIcon: ClipboardCheck,
-  },
-  [ROLE_NAMES.MCAOfficer]: {
-    title: "MCA Dashboard",
-    description: "Review tenders requiring MCA opinion.",
-    focus: "MCA review queue",
-    primaryHref: "/approvals",
-    primaryLabel: "Review Approvals",
-    primaryIcon: ClipboardCheck,
-  },
-  [ROLE_NAMES.CompetentAuthority]: {
-    title: "Competent Authority Dashboard",
-    description: "Review tenders requiring competent authority decisions.",
-    focus: "Authority approval queue",
-    primaryHref: "/approvals",
-    primaryLabel: "Review Approvals",
+    primaryLabel: "Review Financial Results",
     primaryIcon: ClipboardCheck,
   },
 };
@@ -132,10 +92,10 @@ export default function RoleDashboardPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { isLoading: roleLoading, isAuthorized } = useRequireRole(Object.values(ROLE_NAMES));
-  const roleDashboard = ROLE_DASHBOARDS[user?.role ?? ""] ?? ROLE_DASHBOARDS[ROLE_NAMES.TenderSection]!;
+  const roleDashboard = ROLE_DASHBOARDS[user?.role ?? ""] ?? ROLE_DASHBOARDS[ROLE_NAMES.TenderCell]!;
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.role === ROLE_NAMES.Admin) {
+    if (!authLoading && isAuthenticated && user?.role === ROLE_NAMES.JuniorEngineer) {
       router.replace("/admin");
     }
   }, [authLoading, isAuthenticated, router, user?.role]);
@@ -143,16 +103,16 @@ export default function RoleDashboardPage() {
   const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ["role-dashboard-stats"],
     queryFn: fetchRoleDashboardStats,
-    enabled: isAuthenticated && user?.role !== ROLE_NAMES.Admin,
+    enabled: isAuthenticated && user?.role !== ROLE_NAMES.JuniorEngineer,
   });
 
   const { data: pendingApprovals, isLoading: approvalsLoading } = useQuery({
     queryKey: ["pending-approvals"],
-    queryFn: fetchPendingApprovals,
-    enabled: isAuthenticated && user?.role !== ROLE_NAMES.Admin,
+    queryFn: () => fetchPendingApprovals({ pageNumber: 1, pageSize: 4 }),
+    enabled: isAuthenticated && user?.role !== ROLE_NAMES.JuniorEngineer,
   });
 
-  if (authLoading || roleLoading || !isAuthorized || !isAuthenticated || !user || user.role === ROLE_NAMES.Admin) {
+  if (authLoading || roleLoading || !isAuthorized || !isAuthenticated || !user || user.role === ROLE_NAMES.JuniorEngineer) {
     return <main className="mx-auto max-w-6xl px-4 py-8"><Skeleton className="h-32 w-full" /></main>;
   }
 
@@ -201,12 +161,12 @@ export default function RoleDashboardPage() {
               <ClipboardCheck className="h-5 w-5 text-primary" />
             </div>
             {approvalsLoading && <Skeleton className="mt-4 h-20 w-full" />}
-            {!approvalsLoading && pendingApprovals?.length === 0 && (
+            {!approvalsLoading && pendingApprovals?.items.length === 0 && (
               <p className="mt-5 text-sm text-muted-foreground">No tenders are waiting for your role.</p>
             )}
-            {!approvalsLoading && pendingApprovals && pendingApprovals.length > 0 && (
+            {!approvalsLoading && pendingApprovals && pendingApprovals.items.length > 0 && (
               <div className="mt-4 space-y-2">
-                {pendingApprovals.slice(0, 4).map((item) => (
+                {pendingApprovals.items.map((item) => (
                   <Link key={item.tenderId} href={`/tenders/${item.tenderId}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-3 hover:bg-muted/40">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{item.tenderNumber} · {item.title}</p>
@@ -228,12 +188,12 @@ export default function RoleDashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your activity</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-md bg-muted/40 p-3"><p className="text-xl font-bold">{stats?.myTenders ?? "—"}</p><p className="text-xs text-muted-foreground">My tenders</p></div>
-              <div className="rounded-md bg-muted/40 p-3"><p className="text-xl font-bold">{pendingApprovals?.length ?? "—"}</p><p className="text-xs text-muted-foreground">Open actions</p></div>
+              <div className="rounded-md bg-muted/40 p-3"><p className="text-xl font-bold">{pendingApprovals?.totalCount ?? "—"}</p><p className="text-xs text-muted-foreground">Open actions</p></div>
             </div>
             {statsError && <p className="mt-3 text-xs text-destructive">Could not load live dashboard counts.</p>}
             <div className="mt-4 flex flex-wrap gap-2">
               <Button asChild variant="outline" size="sm"><Link href="/tenders"><FileCheck2 className="mr-1 h-4 w-4" />All tenders</Link></Button>
-              {(user.role === ROLE_NAMES.DepartmentOfficer || user.role === ROLE_NAMES.Admin) && <Button asChild variant="outline" size="sm"><Link href="/tenders/new"><Plus className="mr-1 h-4 w-4" />Create Tender</Link></Button>}
+              {user.role === ROLE_NAMES.JuniorEngineer && <Button asChild variant="outline" size="sm"><Link href="/tenders/new"><Plus className="mr-1 h-4 w-4" />Create Tender</Link></Button>}
             </div>
           </CardContent>
         </Card>
@@ -323,9 +283,9 @@ export default function RoleDashboardPage() {
         </CardContent>
       </Card>
 
-      {pendingApprovals && pendingApprovals.length > 0 && (
+      {pendingApprovals && pendingApprovals.items.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {pendingApprovals.slice(0, 4).map((item) => <StatusBadge key={item.tenderId} status={item.currentStatus} />)}
+          {pendingApprovals.items.slice(0, 4).map((item) => <StatusBadge key={item.tenderId} status={item.currentStatus} />)}
         </div>
       )}
     </main>

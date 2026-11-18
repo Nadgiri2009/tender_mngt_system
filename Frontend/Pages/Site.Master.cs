@@ -27,8 +27,7 @@ namespace DepartmentModule.Pages
             bool isLoginPage = String.Equals(Request.AppRelativeCurrentExecutionFilePath,
                 "~/Pages/Login.aspx", StringComparison.OrdinalIgnoreCase);
             string path = Request.AppRelativeCurrentExecutionFilePath;
-            bool isAdmin = String.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-                String.Equals(role, "Super Admin", StringComparison.OrdinalIgnoreCase);
+            bool isAdmin = String.Equals(role, "Junior Engineer (JE)", StringComparison.OrdinalIgnoreCase);
             bool isAdminWorkspace = signedIn && isAdmin &&
                 (path.StartsWith("~/Pages/Admin", StringComparison.OrdinalIgnoreCase) ||
                  String.Equals(path, "~/Pages/Approvals.aspx", StringComparison.OrdinalIgnoreCase) ||
@@ -47,7 +46,7 @@ namespace DepartmentModule.Pages
             PublicNavigation.Visible = !isAdminWorkspace;
             AdminDashboardLink.Visible = isAdminWorkspace;
             AdminUsersLink.Visible = isAdminWorkspace;
-            AdminRolesLink.Visible = isAdminWorkspace;
+            AdminRolesLink.Visible = false;
             AdminMasterDataLink.Visible = isAdminWorkspace;
             AdminTendersLink.Visible = isAdminWorkspace;
             AdminCreateTenderLink.Visible = isAdminWorkspace;
@@ -62,12 +61,9 @@ namespace DepartmentModule.Pages
             DashboardLink.Visible = signedIn && !isAdminWorkspace;
             PublicApprovalsLink.Visible = signedIn && !isAdminWorkspace;
             PublicWorkflowLink.Visible = signedIn && !isAdminWorkspace &&
-                HasRole(role, "Junior Engineer (JE)", "Nivida Kaksh (Tender Cell)",
-                    "Nivida Samiti Adhyaksha", "Chief Auditor", "Contractor / Vendor");
-            PublicTenderLifecycleLink.Visible = signedIn && !isAdminWorkspace &&
-                HasRole(role, "DepartmentOfficer", "CAFOOfficer", "Admin");
-            PublicTenderEvaluationLink.Visible = signedIn && !isAdminWorkspace &&
-                HasRole(role, "CAFOOfficer", "TenderCommittee", "TenderSection", "Admin");
+                HasRole(role, "Tender Cell", "Tender Committee Chairman (Nivida Samiti Adhyaksha)", "Director Auditor");
+            PublicTenderLifecycleLink.Visible = false;
+            PublicTenderEvaluationLink.Visible = false;
             PublicAdminLink.Visible = signedIn && isAdmin && !isAdminWorkspace;
             LoginLink.Visible = !signedIn;
             RegisterLink.Visible = !signedIn && !isLoginPage;

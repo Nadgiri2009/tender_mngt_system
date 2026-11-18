@@ -34,21 +34,25 @@ existing stage assignments.
 
 ## Auth
 
-Sign-in uses a one-time code sent to the user's registered Indian mobile number. Codes expire
-after five minutes, are single-use, and are limited to three requests per 15 minutes and five
-verification attempts. In local Development, the randomly generated code is written to the API
-console; no fixed or reusable OTP is configured. Production and non-local requests currently return
+Sign-in accepts exactly ten digits for the registered mobile number. Codes expire after five
+minutes, are single-use, and are limited to three requests per 15 minutes and five
+verification attempts. For requests made from localhost in local Development, the randomly generated code is returned as
+`developmentOtp` and shown on the login page; it is not written to the API console. No fixed or
+reusable OTP is configured. Production and non-local requests currently return
 `503`; an SMS delivery provider is not implemented. JWT bearer tokens include `sub` (user id),
 `role` (role name — used by
 `[Authorize(Roles = "...")]`), and a custom `roleId` claim (used by the pending-approvals/dashboard
-endpoints to avoid an extra DB round-trip per request). Contractor registration still collects a
-password; that password is not used for sign-in.
+endpoints to avoid an extra DB round-trip per request). Contractor registration does not collect a
+password; sign-in uses the registered mobile and OTP. The local `tender_tracking` database has an
+enabled Junior Engineer (JE) development placeholder (`0000000001`); it is not a real phone number and must never
+be enabled in production. Replace it with a verified mobile number before using the account outside
+local OTP testing.
 
 ## Endpoints
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/auth/request-otp` | Returns a generic `202`; avoids confirming whether a mobile number is registered |
+| POST | `/api/auth/request-otp` | Returns a generic `202`; includes `developmentOtp` only for an eligible local Development request |
 | POST | `/api/auth/login` | Verifies `{ "mobile": "...", "otp": "123456" }` |
 | POST | `/api/auth/register` | Contractor self-registration |
 | GET/POST | `/api/tenders` | paginated/search/filter on GET |

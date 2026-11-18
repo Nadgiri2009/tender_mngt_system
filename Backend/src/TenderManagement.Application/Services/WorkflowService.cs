@@ -1,4 +1,5 @@
 using TenderManagement.Application.Common;
+using TenderManagement.Application.DTOs.Common;
 using TenderManagement.Application.DTOs.Tender;
 using TenderManagement.Application.DTOs.Workflow;
 using TenderManagement.Application.Interfaces;
@@ -18,100 +19,78 @@ namespace TenderManagement.Application.Services
             _auditService = auditService;
         }
 
-        public async Task<ApprovalHistoryDto> SubmitAsync(int tenderId, SubmitTenderDto dto, int currentUserId, string roleName)
+        public Task<ApprovalHistoryDto> SubmitAsync(
+            int tenderId, SubmitTenderDto dto, int currentUserId, int roleId) =>
+            ExecuteConfiguredTransitionAsync(tenderId, "Submit", null,
+                currentUserId, roleId, dto.Remarks);
+
+        public Task<ApprovalHistoryDto> ApproveAsync(
+            int tenderId, ApproveRejectDto dto, int currentUserId, int roleId) =>
+            ExecuteConfiguredTransitionAsync(tenderId, "Approve", null,
+                currentUserId, roleId, dto.Remarks);
+
+        public Task<ApprovalHistoryDto> RejectAsync(
+            int tenderId, ApproveRejectDto dto, int currentUserId, int roleId) =>
+            ExecuteConfiguredTransitionAsync(tenderId, "Reject", null,
+                currentUserId, roleId, dto.Remarks);
+
+        public Task<ApprovalHistoryDto> ExecuteActionAsync(
+            int tenderId, string actionName, string? remarks, int currentUserId, int roleId) =>
+            ExecuteConfiguredTransitionAsync(tenderId, actionName, null,
+                currentUserId, roleId, remarks);
+
+        private async Task<ApprovalHistoryDto> ExecuteConfiguredTransitionAsync(
+            int tenderId,
+            string actionName,
+            string? transitionCode,
+            int currentUserId,
+            int roleId,
+            string? remarks)
         {
             var tender = await _unitOfWork.Tenders.GetByIdAsync(tenderId)
                 ?? throw new NotFoundException(nameof(Tender), tenderId);
+            var user = await _unitOfWork.Users.GetByIdAsync(currentUserId)
+                ?? throw new ForbiddenActionException("The authenticated account is unavailable.");
+            var role = user.AccountType == "Internal" && user.RoleId == roleId
+                ? await _unitOfWork.Roles.GetByIdAsync(roleId)
+                : null;
+            if (role is null || !role.IsActive)
+                throw new ForbiddenActionException("The authenticated role is not permitted to act on this workflow.");
 
-            if (!WorkflowEngine.Transitions.TryGetValue(tender.CurrentStatus, out var transition) || transition.SubmitToStatus is null)
-            {
-                throw new BusinessRuleException($"No submit action is available from status '{tender.CurrentStatus}'.");
-            }
+            var matches = await _unitOfWork.WorkflowTransitions.FindAsync(transition =>
+                transition.IsActive &&
+                transition.WorkflowVersion == 2 &&
+                transition.FromStatus == tender.CurrentStatus &&
+                transition.ActionName == actionName &&
+                transition.RoleId == roleId &&
+                (transitionCode == null || transition.TransitionCode == transitionCode));
+            var configuredTransition = matches.SingleOrDefault();
+            if (configuredTransition is null)
+                throw new ForbiddenActionException(
+                    $"No active '{actionName}' transition is configured for the current status and role.");
 
-            if (!WorkflowEngine.IsRoleAllowed(transition.SubmitRoles, roleName))
-            {
-                throw new ForbiddenActionException($"Role '{roleName}' is not permitted to submit a tender at status '{tender.CurrentStatus}'.");
-            }
+            var stage = await _unitOfWork.WorkflowStages.GetByIdAsync(configuredTransition.StageId)
+                ?? throw new InvalidOperationException("The configured workflow stage no longer exists.");
 
             await _unitOfWork.ExecuteWorkflowTransitionAsync(
-                tenderId, transition.ApprovalStage, transition.SubmitToStatus, "Submitted", currentUserId, roleName, dto.Remarks);
+                tenderId,
+                configuredTransition.TransitionCode,
+                tender.CurrentStatus,
+                currentUserId,
+                roleId,
+                remarks);
 
-            await _auditService.LogAsync(currentUserId, "Submit", nameof(Tender), tenderId, transition.SubmitToStatus);
+            await _auditService.LogAsync(currentUserId, actionName, nameof(Tender), tenderId,
+                configuredTransition.ToStatus);
 
             return new ApprovalHistoryDto
             {
-                ApprovalStage = transition.ApprovalStage,
+                ApprovalStage = stage.StageName,
                 PreviousStatus = tender.CurrentStatus,
-                NewStatus = transition.SubmitToStatus,
-                Status = "Submitted",
-                RoleAtAction = roleName,
-                Remarks = dto.Remarks,
-                ApprovalDate = DateTime.UtcNow
-            };
-        }
-
-        public async Task<ApprovalHistoryDto> ApproveAsync(int tenderId, ApproveRejectDto dto, int currentUserId, string roleName)
-        {
-            var tender = await _unitOfWork.Tenders.GetByIdAsync(tenderId)
-                ?? throw new NotFoundException(nameof(Tender), tenderId);
-
-            if (!WorkflowEngine.Transitions.TryGetValue(tender.CurrentStatus, out var transition) || transition.ApproveToStatus is null)
-            {
-                throw new BusinessRuleException($"No approval action is available from status '{tender.CurrentStatus}'.");
-            }
-
-            if (!WorkflowEngine.IsRoleAllowed(transition.ApproverRoles, roleName))
-            {
-                throw new ForbiddenActionException($"Role '{roleName}' is not authorized to approve at status '{tender.CurrentStatus}'.");
-            }
-
-            await _unitOfWork.ExecuteWorkflowTransitionAsync(
-                tenderId, transition.ApprovalStage, transition.ApproveToStatus, "Approved", currentUserId, roleName, dto.Remarks);
-
-            await _auditService.LogAsync(currentUserId, "Approve", nameof(Tender), tenderId, transition.ApproveToStatus);
-
-            return new ApprovalHistoryDto
-            {
-                ApprovalStage = transition.ApprovalStage,
-                PreviousStatus = tender.CurrentStatus,
-                NewStatus = transition.ApproveToStatus,
-                Status = "Approved",
-                RoleAtAction = roleName,
-                Remarks = dto.Remarks,
-                ApprovalDate = DateTime.UtcNow
-            };
-        }
-
-        public async Task<ApprovalHistoryDto> RejectAsync(int tenderId, ApproveRejectDto dto, int currentUserId, string roleName)
-        {
-            var tender = await _unitOfWork.Tenders.GetByIdAsync(tenderId)
-                ?? throw new NotFoundException(nameof(Tender), tenderId);
-
-            if (!WorkflowEngine.Transitions.TryGetValue(tender.CurrentStatus, out var transition) || transition.ApproveToStatus is null)
-            {
-                throw new BusinessRuleException($"No reject action is available from status '{tender.CurrentStatus}'.");
-            }
-
-            if (!WorkflowEngine.IsRoleAllowed(transition.ApproverRoles, roleName))
-            {
-                throw new ForbiddenActionException($"Role '{roleName}' is not authorized to reject at status '{tender.CurrentStatus}'.");
-            }
-
-            var rejectStatus = transition.RejectToStatus ?? Domain.Enums.TenderStatus.Rejected;
-
-            await _unitOfWork.ExecuteWorkflowTransitionAsync(
-                tenderId, transition.ApprovalStage, rejectStatus, "Rejected", currentUserId, roleName, dto.Remarks);
-
-            await _auditService.LogAsync(currentUserId, "Reject", nameof(Tender), tenderId, rejectStatus);
-
-            return new ApprovalHistoryDto
-            {
-                ApprovalStage = transition.ApprovalStage,
-                PreviousStatus = tender.CurrentStatus,
-                NewStatus = rejectStatus,
-                Status = "Rejected",
-                RoleAtAction = roleName,
-                Remarks = dto.Remarks,
+                NewStatus = configuredTransition.ToStatus,
+                Status = configuredTransition.ActionStatus,
+                RoleAtAction = role.RoleName,
+                Remarks = remarks,
                 ApprovalDate = DateTime.UtcNow
             };
         }
@@ -119,91 +98,218 @@ namespace TenderManagement.Application.Services
         public async Task<List<ApprovalHistoryDto>> GetHistoryAsync(int tenderId)
         {
             var history = await _unitOfWork.ApprovalHistories.FindAsync(a => a.TenderId == tenderId);
-
             var result = new List<ApprovalHistoryDto>();
-            foreach (var h in history.OrderBy(h => h.ApprovalDate))
+            foreach (var item in history.OrderBy(item => item.ApprovalDate))
             {
-                var user = await _unitOfWork.Users.GetByIdAsync(h.ApprovedBy);
+                var user = await _unitOfWork.Users.GetByIdAsync(item.ApprovedBy);
                 result.Add(new ApprovalHistoryDto
                 {
-                    ApprovalId = h.ApprovalId,
-                    ApprovalStage = h.ApprovalStage,
-                    PreviousStatus = h.PreviousStatus,
-                    NewStatus = h.NewStatus,
-                    Status = h.Status,
+                    ApprovalId = item.ApprovalId,
+                    ApprovalStage = item.ApprovalStage,
+                    PreviousStatus = item.PreviousStatus,
+                    NewStatus = item.NewStatus,
+                    Status = item.Status,
                     ActionTakenBy = user?.FullName ?? "Unknown",
-                    RoleAtAction = h.RoleAtAction,
-                    Remarks = h.Remarks,
-                    ApprovalDate = h.ApprovalDate
+                    RoleAtAction = item.RoleAtAction,
+                    Remarks = item.Remarks,
+                    ApprovalDate = item.ApprovalDate
                 });
             }
             return result;
         }
 
-        public async Task<List<PendingApprovalDto>> GetPendingApprovalsForRoleAsync(int roleId, int userId)
+        public async Task<PagedResult<PendingApprovalDto>> GetPendingApprovalsForRoleAsync(
+            int roleId,
+            int userId,
+            PaginationQuery query)
         {
-            var role = await _unitOfWork.Roles.GetByIdAsync(roleId);
-            if (role is null) throw new NotFoundException(nameof(Role), roleId);
+            var user = await _unitOfWork.Users.GetByIdAsync(userId)
+                ?? throw new ForbiddenActionException("The authenticated account is unavailable.");
+            var role = await _unitOfWork.Roles.GetByIdAsync(roleId)
+                ?? throw new NotFoundException(nameof(Role), roleId);
+            if (!user.IsActive || user.AccountType != "Internal" || user.RoleId != roleId || !role.IsActive)
+                throw new ForbiddenActionException("The authenticated role is not permitted to view this approval queue.");
 
-            // Statuses currently awaiting THIS role's approval, derived from the engine.
-            var pendingStatuses = WorkflowEngine.Transitions
-                .Where(kv => kv.Value.ApproveToStatus is not null && WorkflowEngine.IsRoleAllowed(kv.Value.ApproverRoles, role.RoleName))
-                .Select(kv => kv.Key)
-                .ToHashSet();
-
-            var tenders = await _unitOfWork.Tenders.FindAsync(t =>
-                !t.IsDeleted &&
-                pendingStatuses.Contains(t.CurrentStatus) &&
-                (role.RoleName != RoleNames.DepartmentOfficer || t.CreatedBy == userId));
-
-            return tenders.Select(t => new PendingApprovalDto
+            var roleTransitions = await GetPermittedTransitionsAsync(roleId);
+            var pendingStatuses = roleTransitions.Select(transition => transition.FromStatus).ToHashSet();
+            query.PageNumber = Math.Max(1, query.PageNumber);
+            query.PageSize = Math.Clamp(query.PageSize, 1, 100);
+            if (pendingStatuses.Count == 0)
             {
-                TenderId = t.TenderId,
-                TenderNumber = t.TenderNumber,
-                Title = t.Title,
-                CurrentStatus = t.CurrentStatus,
-                EstimatedAmount = t.EstimatedAmount,
-                DepartmentName = t.Department?.DepartmentName ?? string.Empty,
-                CreatedDate = t.CreatedDate
-            }).OrderByDescending(t => t.CreatedDate).ToList();
+                return new PagedResult<PendingApprovalDto>
+                {
+                    Items = Array.Empty<PendingApprovalDto>(),
+                    TotalCount = 0,
+                    PageNumber = query.PageNumber,
+                    PageSize = query.PageSize
+                };
+            }
+
+            var (tenders, total) = await _unitOfWork.Tenders.GetAssignedPendingPageAsync(
+                query,
+                pendingStatuses.ToArray(),
+                roleId,
+                userId,
+                user.DepartmentId,
+                role.RoleCode == "Junior Engineer (JE)");
+
+            var items = tenders.Select(tender => new PendingApprovalDto
+            {
+                TenderId = tender.TenderId,
+                TenderNumber = tender.TenderNumber,
+                Title = tender.Title,
+                CurrentStatus = tender.CurrentStatus,
+                EstimatedAmount = tender.EstimatedAmount,
+                DepartmentName = tender.Department?.DepartmentName ?? string.Empty,
+                CreatedDate = tender.CreatedDate,
+                AvailableActions = roleTransitions
+                    .Where(transition => transition.FromStatus == tender.CurrentStatus)
+                    .Select(transition => transition.ActionName)
+                    .Distinct()
+                    .OrderBy(action => action)
+                    .ToList()
+            }).ToArray();
+
+            return new PagedResult<PendingApprovalDto>
+            {
+                Items = items,
+                TotalCount = total,
+                PageNumber = query.PageNumber,
+                PageSize = query.PageSize
+            };
         }
 
         public async Task<DashboardStatsDto> GetDashboardStatsAsync(int userId, int roleId)
         {
-            var role = await _unitOfWork.Roles.GetByIdAsync(roleId);
-            if (role is null) throw new NotFoundException(nameof(Role), roleId);
-            var createdByUserId = role.RoleName == RoleNames.DepartmentOfficer ? userId : (int?)null;
-            var allTenders = (await _unitOfWork.Tenders.FindAsync(t =>
-                !t.IsDeleted && (!createdByUserId.HasValue || t.CreatedBy == createdByUserId.Value))).ToList();
+            var role = await _unitOfWork.Roles.GetByIdAsync(roleId)
+                ?? throw new NotFoundException(nameof(Role), roleId);
+            var createdByUserId = role.RoleCode == "Junior Engineer (JE)" ? userId : (int?)null;
+            var allTenders = (await _unitOfWork.Tenders.FindAsync(tender =>
+                !tender.IsDeleted && (!createdByUserId.HasValue || tender.CreatedBy == createdByUserId.Value))).ToList();
             var recentTenders = await _unitOfWork.Tenders.GetDashboardTendersAsync(createdByUserId, 5, upcomingOnly: false);
             var upcomingDeadlines = await _unitOfWork.Tenders.GetDashboardTendersAsync(createdByUserId, 5, upcomingOnly: true);
-            var now = DateTime.UtcNow;
 
             return new DashboardStatsDto
             {
                 TotalTenders = allTenders.Count,
-                ApprovedTenders = allTenders.Count(t => TenderStatusBuckets.IsApproved(t.CurrentStatus)),
-                PendingTenders = allTenders.Count(t => TenderStatusBuckets.IsPending(t.CurrentStatus)),
-                RejectedTenders = allTenders.Count(t => TenderStatusBuckets.IsRejected(t.CurrentStatus)),
-                UnderReviewTenders = allTenders.Count(t => TenderStatusBuckets.IsUnderReview(t.CurrentStatus)),
-                PublishedTenders = allTenders.Count(t => t.CurrentStatus == TenderStatus.TenderPublished),
-                DraftTenders = allTenders.Count(t => t.CurrentStatus == TenderStatus.Draft),
-                ClosedExpiredTenders = allTenders.Count(t =>
-                    t.CurrentStatus == TenderStatus.TenderPublished &&
-                    t.SubmissionDeadline.HasValue &&
-                    t.SubmissionDeadline.Value < now),
-                PendingApprovals = allTenders.Count(t => TenderStatusBuckets.IsPending(t.CurrentStatus) || TenderStatusBuckets.IsUnderReview(t.CurrentStatus)),
-                CompletedTenders = allTenders.Count(t => t.CurrentStatus == TenderStatus.PaymentCompleted),
-                MyTenders = allTenders.Count(t => t.CreatedBy == userId),
+                ApprovedTenders = allTenders.Count(tender => TenderStatusBuckets.IsApproved(tender.CurrentStatus)),
+                PendingTenders = allTenders.Count(tender => TenderStatusBuckets.IsPending(tender.CurrentStatus)),
+                RejectedTenders = allTenders.Count(tender => TenderStatusBuckets.IsRejected(tender.CurrentStatus)),
+                UnderReviewTenders = allTenders.Count(tender => TenderStatusBuckets.IsUnderReview(tender.CurrentStatus)),
+                PublishedTenders = allTenders.Count(tender => tender.CurrentStatus == TenderStatus.TenderPublished),
+                DraftTenders = allTenders.Count(tender => tender.CurrentStatus == TenderStatus.Draft),
+                ClosedExpiredTenders = allTenders.Count(tender =>
+                    tender.CurrentStatus == TenderStatus.TenderPublished &&
+                    tender.SubmissionDeadline.HasValue &&
+                    tender.SubmissionDeadline.Value < DateTime.UtcNow),
+                PendingApprovals = allTenders.Count(tender =>
+                    TenderStatusBuckets.IsPending(tender.CurrentStatus) ||
+                    TenderStatusBuckets.IsUnderReview(tender.CurrentStatus)),
+                CompletedTenders = allTenders.Count(tender => tender.CurrentStatus == TenderStatus.TenderAgreementGenerated),
+                MyTenders = allTenders.Count(tender => tender.CreatedBy == userId),
                 CategoryBreakdown = allTenders
-                    .GroupBy(t => t.TenderType)
-                    .Select(g => new DashboardCategoryCountDto { Category = g.Key, TenderCount = g.Count() })
-                    .OrderByDescending(g => g.TenderCount)
-                    .ThenBy(g => g.Category)
+                    .GroupBy(tender => tender.TenderType)
+                    .Select(group => new DashboardCategoryCountDto
+                    {
+                        Category = group.Key,
+                        TenderCount = group.Count()
+                    })
+                    .OrderByDescending(group => group.TenderCount)
+                    .ThenBy(group => group.Category)
                     .ToList(),
                 RecentTenders = recentTenders.Select(MapDashboardTender).ToList(),
                 UpcomingDeadlines = upcomingDeadlines.Select(MapDashboardTender).ToList()
             };
+        }
+
+        public async Task<List<WorkflowStepDto>> GetWorkflowStepsAsync()
+        {
+            var transitions = (await _unitOfWork.WorkflowTransitions.FindAsync(
+                transition => transition.IsActive && transition.WorkflowVersion == 2))
+                .OrderBy(transition => transition.StageId)
+                .ToList();
+            var roles = (await _unitOfWork.Roles.GetAllAsync()).ToDictionary(role => role.RoleId);
+            var steps = new List<WorkflowStepDto>();
+
+            foreach (var transition in transitions)
+            {
+                var stage = await _unitOfWork.WorkflowStages.GetByIdAsync(transition.StageId);
+                steps.Add(new WorkflowStepDto
+                {
+                    Status = transition.FromStatus,
+                    StageName = stage?.StageName ?? transition.TransitionCode,
+                    AssigneeRole = roles.TryGetValue(transition.RoleId, out var role) ? role.RoleName : null,
+                    IsCurrent = false
+                });
+            }
+
+            return steps;
+        }
+
+        public async Task<List<WorkflowActionOptionDto>> GetAvailableActionsAsync(
+            int tenderId, int userId, int roleId)
+        {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId)
+                ?? throw new ForbiddenActionException("The authenticated account is unavailable.");
+            var role = user.AccountType == "Internal" && user.RoleId == roleId
+                ? await _unitOfWork.Roles.GetByIdAsync(roleId)
+                : null;
+            if (role is null || !role.IsActive)
+                throw new ForbiddenActionException("The authenticated role is not permitted to act on this workflow.");
+
+            var tender = await _unitOfWork.Tenders.GetByIdAsync(tenderId)
+                ?? throw new NotFoundException(nameof(Tender), tenderId);
+            var assignments = await _unitOfWork.TenderWorkflowAssignments.FindAsync(assignment =>
+                assignment.TenderId == tenderId &&
+                assignment.ShortfallId == null &&
+                assignment.IsCurrent &&
+                assignment.AssignedRoleId == roleId &&
+                (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == userId) &&
+                (role.RoleCode == "Junior Engineer (JE)" || !user.DepartmentId.HasValue || assignment.DepartmentId == user.DepartmentId.Value));
+            if (tender.WorkflowVersion != 2 || assignments.Count() != 1)
+                return new List<WorkflowActionOptionDto>();
+
+            var permittedTransitionIds = (await GetPermittedTransitionsAsync(roleId))
+                .Select(transition => transition.TransitionId)
+                .ToHashSet();
+            var transitions = await _unitOfWork.WorkflowTransitions.FindAsync(transition =>
+                transition.IsActive && transition.WorkflowVersion == 2 &&
+                transition.FromStatus == tender.CurrentStatus &&
+                transition.RoleId == roleId &&
+                permittedTransitionIds.Contains(transition.TransitionId));
+            var result = new List<WorkflowActionOptionDto>();
+
+            foreach (var transition in transitions)
+            {
+                var stage = await _unitOfWork.WorkflowStages.GetByIdAsync(transition.StageId);
+                if (stage is not null && stage.IsActive)
+                {
+                    result.Add(new WorkflowActionOptionDto(
+                        transition.ActionName,
+                        stage.StageName,
+                        transition.FromStatus,
+                        transition.ToStatus));
+                }
+            }
+
+            return result.OrderBy(action => action.ActionName).ToList();
+        }
+
+        private async Task<List<WorkflowTransition>> GetPermittedTransitionsAsync(int roleId)
+        {
+            var transitions = (await _unitOfWork.WorkflowTransitions.FindAsync(transition =>
+                transition.IsActive && transition.WorkflowVersion == 2 && transition.RoleId == roleId)).ToList();
+            if (transitions.Count == 0)
+                return transitions;
+
+            var roleGrants = await _unitOfWork.RolePermissions.FindAsync(grant => grant.RoleId == roleId);
+            var permissionIds = roleGrants.Select(grant => grant.PermissionId).ToHashSet();
+            var permissionKeys = (await _unitOfWork.Permissions.FindAsync(permission =>
+                permission.IsActive && permissionIds.Contains(permission.PermissionId)))
+                .Select(permission => permission.PermissionKey)
+                .ToHashSet(StringComparer.Ordinal);
+
+            return transitions.Where(transition => permissionKeys.Contains(transition.PermissionKey)).ToList();
         }
 
         private static TenderListItemDto MapDashboardTender(Tender tender) => new()

@@ -179,7 +179,7 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
             </Card>
           )}
 
-          {user?.role !== ROLE_NAMES.Contractor && (
+          {user?.role !== ROLE_NAMES.ExternalBidder && (
             <BidsPanel tenderId={tender.tenderId} currentStatus={tender.currentStatus} />
           )}
 
@@ -201,7 +201,7 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
             </Card>
           )}
 
-          {user && user.role !== ROLE_NAMES.Contractor && (
+          {user && user.role !== ROLE_NAMES.ExternalBidder && (
             <div className="w-full">
               <WorkflowPanel tenderId={tender.tenderId} currentStatus={tender.currentStatus} departmentName={tender.departmentName} />
             </div>

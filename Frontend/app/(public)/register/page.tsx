@@ -6,15 +6,13 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
 
 import { register as registerApi } from "@/lib/api/auth";
-import { fetchRegistrationRole } from "@/lib/api/roles";
 import { ApiError } from "@/lib/api/client";
 import { getAuthReturnUrl } from "@/lib/authRedirect";
-import { useAuth } from "@/contexts/AuthContext";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,26 +24,15 @@ const registerSchema = z.object({
   companyName: z.string().trim().min(2, "Vendor or company name is required").max(150),
   address: z.string().trim().max(300, "Address must be 300 characters or fewer").optional(),
   email: z.string().email("Enter a valid email address"),
-  mobile: z.string().regex(/^\+?[0-9\s()-]{10,16}$/, "Enter a valid mobile number"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
+  mobile: z.string().regex(/^\d{10}$/, "Enter a 10-digit mobile number"),
   termsAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the Terms & Conditions" }) }),
-}).refine((values) => values.password === values.confirmPassword, {
-  path: ["confirmPassword"],
-  message: "Passwords do not match",
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { setSession } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
-
-  const { data: contractorRole, isLoading: rolesLoading } = useQuery({
-    queryKey: ["registration-role"],
-    queryFn: fetchRegistrationRole,
-  });
 
   const {
     register,
@@ -54,16 +41,10 @@ export default function RegisterPage() {
   } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
 
   const mutation = useMutation({
-    mutationFn: (values: RegisterFormValues) => {
-      if (!contractorRole) {
-        throw new Error("Contractor role is not configured on the server yet.");
-      }
-      return registerApi({ ...values, roleId: contractorRole.roleId });
-    },
-    onSuccess: (auth) => {
-      setSession(auth);
-      toast.success(`Welcome, ${auth.fullName}. Your vendor account is ready.`);
-      router.replace(getAuthReturnUrl() ?? "/tenders");
+    mutationFn: (values: RegisterFormValues) => registerApi(values),
+    onSuccess: (response) => {
+      toast.success(response.message);
+      router.replace("/login");
     },
     onError: (error: Error) => {
       setServerError(error instanceof ApiError ? error.message : error.message || "Registration failed.");
@@ -117,16 +98,6 @@ export default function RegisterPage() {
               {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password <span aria-hidden="true">*</span></Label>
-              <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
-              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password <span aria-hidden="true">*</span></Label>
-              <Input id="confirmPassword" type="password" autoComplete="new-password" {...register("confirmPassword")} />
-              {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
-            </div>
-            <div className="space-y-2">
               <label htmlFor="termsAccepted" className="flex items-start gap-2 text-sm">
                 <input id="termsAccepted" type="checkbox" className="mt-1" {...register("termsAccepted")} />
                 <span>I accept the <Link href="/terms" target="_blank" className="font-medium text-primary underline">Terms &amp; Conditions</Link>. <span aria-hidden="true">*</span></span>
@@ -139,7 +110,7 @@ export default function RegisterPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting || mutation.isPending || rolesLoading || !contractorRole}
+              disabled={isSubmitting || mutation.isPending}
             >
               {mutation.isPending ? "Creating account..." : "Register as Contractor"}
             </Button>

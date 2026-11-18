@@ -13,6 +13,7 @@ namespace TenderManagement.Domain.Entities
         public string StatusOnApprove { get; set; } = string.Empty;
         public string StatusOnReject { get; set; } = "Rejected";
         public int ApproverRoleId { get; set; }
+        public short WorkflowVersion { get; set; } = 1;
         public bool IsActive { get; set; } = true;
 
         public Role ApproverRole { get; set; } = null!;

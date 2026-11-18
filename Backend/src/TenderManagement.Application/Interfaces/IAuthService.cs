@@ -7,6 +7,6 @@ namespace TenderManagement.Application.Interfaces
         Task<RequestLoginOtpResponseDto> RequestLoginOtpAsync(
             RequestLoginOtpRequestDto request, CancellationToken cancellationToken);
         Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken);
-        Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request, CancellationToken cancellationToken);
+        Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto request, CancellationToken cancellationToken);
     }
 }

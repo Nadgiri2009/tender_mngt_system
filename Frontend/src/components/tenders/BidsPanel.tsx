@@ -60,10 +60,15 @@ function bidStatusVariant(status: string): "default" | "success" | "destructive"
 export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
-  const isContractor = user?.role === "Contractor";
-  const isAdmin = user?.role === "Admin";
-  const canEvaluateTechnical = user?.role === "TenderSection" || isAdmin;
-  const canSelectContractor = user?.role === "TenderCommittee" || isAdmin;
+  const isContractor = user?.accountType === "ExternalBidder";
+  const isInternal = user?.accountType === "Internal";
+  const canReadTechnical = user?.role === "Junior Engineer (JE)" || user?.role === "Tender Cell";
+  const canReadFinancial = user?.role === "Junior Engineer (JE)" ||
+    user?.role === "Tender Committee Chairman (Nivida Samiti Adhyaksha)" ||
+    user?.role === "Director Auditor";
+  const isAdmin = false;
+  const canEvaluateTechnical = false;
+  const canSelectContractor = false;
 
   const [evaluateTarget, setEvaluateTarget] = useState<TechnicalBidDto | null>(null);
   const [evaluateRemarks, setEvaluateRemarks] = useState("");
@@ -79,27 +84,27 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
   const { data: technicalBids, isLoading: loadingTechnical } = useQuery({
     queryKey: ["technical-bids", tenderId],
     queryFn: () => fetchTechnicalBids(tenderId),
-    enabled: isAuthenticated && relevant,
+    enabled: isAuthenticated && isInternal && canReadTechnical && relevant,
   });
 
   const { data: financialBids, isLoading: loadingFinancial } = useQuery({
     queryKey: ["financial-bids", tenderId],
     queryFn: () => fetchFinancialBidsRanked(tenderId),
-    enabled: isAuthenticated && relevant,
+    enabled: isAuthenticated && isInternal && canReadFinancial && relevant,
   });
 
   // Only fetched for Contractor users, to auto-resolve their own ContractorId.
   const { data: myProfile } = useQuery({
     queryKey: ["my-contractor-profile"],
     queryFn: fetchMyContractorProfile,
-    enabled: isAuthenticated && isContractor,
+    enabled: false,
   });
 
   // Only fetched for Admin, who may submit a bid on behalf of any contractor.
   const { data: contractorList } = useQuery({
     queryKey: ["contractors"],
     queryFn: fetchContractors,
-    enabled: isAuthenticated && isAdmin && techDialogOpen,
+    enabled: false,
   });
 
   const invalidateBids = () => {
@@ -152,7 +157,7 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
     onError: (error: ApiError) => toast.error(error.message || "Selection failed."),
   });
 
-  if (!isAuthenticated || !relevant) {
+  if (!isAuthenticated || !isInternal || !relevant) {
     return null;
   }
 

@@ -28,7 +28,7 @@ namespace DepartmentModule.Pages
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (!RequireRoles("Admin")) return;
+            if (!RequireAnyPermission("masterdata.manage", "users.manage")) return;
             if (!IsPostBack) LoadDashboard();
         }
 

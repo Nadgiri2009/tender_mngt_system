@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/tenders/StatusBadge";
-import { Search, ChevronLeft, ChevronRight, FileWarning, Eye, Send } from "lucide-react";
+import { PaginationControls } from "@/components/layout/PaginationControls";
+import { Search, FileWarning, Eye, Send } from "lucide-react";
 
 const ALL = "__all__";
 
@@ -63,8 +64,6 @@ export function TenderTable() {
         sortDescending: true,
       }),
   });
-
-  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div className="space-y-4">
@@ -255,30 +254,14 @@ export function TenderTable() {
         </Table>
       </div>
 
-      {data && data.totalCount > 0 && (
-        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Page {data.pageNumber} of {totalPages} &middot; {data.totalCount} tenders total
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pageNumber <= 1}
-              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4" /> Prev
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pageNumber >= totalPages}
-              onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {data && (
+        <PaginationControls
+          pageNumber={data.pageNumber}
+          pageSize={data.pageSize}
+          totalCount={data.totalCount}
+          totalPages={data.totalPages}
+          onPageChange={setPageNumber}
+        />
       )}
     </div>
   );

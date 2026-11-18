@@ -69,6 +69,14 @@ export interface CreateTenderInput {
   estimatedAmount: number;
   tenderType: string;
   tenderCategory: string;
+  budgetInformation?: string;
+  technicalSanctionNumber?: string;
+  technicalSanctionAuthority?: string;
+  technicalSanctionDate?: string;
+  preBidMeetingUtc?: string;
+  preBidLocation?: string;
+  preBidDetails?: string;
+  technicalBidOpeningScheduledUtc?: string;
   submissionStartDate?: string;
   submissionDeadline?: string;
 }

@@ -1,10 +1,12 @@
 import { apiClient, toApiError } from "./client";
+import type { PagedResult } from "@/types/tender";
 
 export interface AdminUser {
   userId: number;
   fullName: string;
   email: string;
   mobile: string | null;
+  accountType: string;
   roleName: string;
   departmentName: string | null;
   isActive: boolean;
@@ -18,6 +20,35 @@ export interface CreateStaffUserInput {
   password: string;
   roleId: number;
   departmentId?: number;
+}
+
+export interface UpdateStaffUserInput {
+  fullName: string;
+  email: string;
+  mobile: string;
+  roleId: number;
+  departmentId?: number;
+}
+
+export interface AdminUserQuery {
+  pageNumber: number;
+  pageSize: number;
+  search?: string;
+}
+
+export async function fetchUsersPage(query: AdminUserQuery): Promise<PagedResult<AdminUser>> {
+  try {
+    const { data } = await apiClient.get<PagedResult<AdminUser>>("/users/paged", {
+      params: {
+        pageNumber: query.pageNumber,
+        pageSize: query.pageSize,
+        search: query.search || undefined,
+      },
+    });
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
 }
 
 // GET /api/users - Admin only (Controllers/AdminController.cs -> UsersController)
@@ -45,6 +76,31 @@ export async function toggleUserActive(id: number): Promise<{ userId: number; is
   try {
     const { data } = await apiClient.put(`/users/${id}/toggle-active`);
     return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function updateStaffUser(id: number, input: UpdateStaffUserInput): Promise<AdminUser> {
+  try {
+    const { data } = await apiClient.put<AdminUser>(`/users/${id}`, input);
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function resetUserPassword(id: number, password: string): Promise<void> {
+  try {
+    await apiClient.put(`/users/${id}/reset-password`, { password });
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  try {
+    await apiClient.delete(`/users/${id}`);
   } catch (error) {
     throw toApiError(error);
   }

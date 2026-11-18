@@ -20,7 +20,7 @@ namespace DepartmentModule.Pages
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (!RequireRoles("Admin")) return;
+            if (!RequirePermission("masterdata.manage")) return;
             if (!IsPostBack)
             {
                 try

@@ -7,7 +7,8 @@ namespace TenderManagement.Domain.Entities
         public string Email { get; set; } = string.Empty;
         public string? Mobile { get; set; }
         public string PasswordHash { get; set; } = string.Empty;
-        public int RoleId { get; set; }
+        public string AccountType { get; set; } = "Internal";
+        public int? RoleId { get; set; }
         public int? DepartmentId { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
@@ -15,7 +16,7 @@ namespace TenderManagement.Domain.Entities
         public DateTime? ModifiedDate { get; set; }
         public int? ModifiedBy { get; set; }
 
-        public Role Role { get; set; } = null!;
+        public Role? Role { get; set; }
         public Department? Department { get; set; }
     }
 }

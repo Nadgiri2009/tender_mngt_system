@@ -97,7 +97,7 @@ export default function TenderApplicationPage({ params }: TenderApplicationPageP
     return <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8"><p className="text-sm text-destructive">Invalid tender reference.</p><Button asChild variant="outline" className="mt-4"><Link href="/tenders">Browse tenders</Link></Button></main>;
   }
 
-  if (user.role !== ROLE_NAMES.Contractor) {
+  if (user.role !== ROLE_NAMES.ExternalBidder) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
         <Card>

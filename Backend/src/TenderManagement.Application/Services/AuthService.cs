@@ -41,20 +41,25 @@ namespace TenderManagement.Application.Services
                 throw new OtpDeliveryUnavailableException();
             }
 
-            var mobile = NormalizeMobile(request.Mobile)
+            var mobile = NormalizeLoginMobile(request.Mobile)
                 ?? throw new BusinessRuleException("Enter a valid Indian mobile number.");
             var activeUsers = await _unitOfWork.Users.FindAsync(
                 user => user.IsActive && user.Mobile != null, cancellationToken);
             var user = activeUsers.FirstOrDefault(candidate =>
-                NormalizeMobile(candidate.Mobile) == mobile);
+                NormalizeLoginMobile(candidate.Mobile) == mobile);
 
             if (user is not null)
             {
-                var role = await _unitOfWork.Roles.GetByIdAsync(user.RoleId, cancellationToken);
-                if (role is null || !role.IsActive)
+                if (user.AccountType == "Internal")
                 {
-                    user = null;
+                    var role = user.RoleId.HasValue
+                        ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value, cancellationToken)
+                        : null;
+                    if (role is null || !role.IsActive)
+                        user = null;
                 }
+                else if (user.AccountType != "ExternalBidder" || user.RoleId.HasValue)
+                    user = null;
             }
 
             var now = DateTimeOffset.UtcNow;
@@ -66,18 +71,21 @@ namespace TenderManagement.Application.Services
                 now,
                 now.AddMinutes(5));
 
+            string? developmentOtp = null;
             if (user is not null && canSend)
             {
                 await _otpDeliveryService.SendAsync(mobile, code, cancellationToken);
+                if (_otpDeliveryService.CanExposeOtp)
+                    developmentOtp = code;
             }
 
-            return new RequestLoginOtpResponseDto(OtpRequestMessage);
+            return new RequestLoginOtpResponseDto(OtpRequestMessage, developmentOtp);
         }
 
         public async Task<AuthResponseDto> LoginAsync(
             LoginRequestDto request, CancellationToken cancellationToken)
         {
-            var mobile = NormalizeMobile(request.Mobile);
+            var mobile = NormalizeLoginMobile(request.Mobile);
             if (mobile is null ||
                 !_otpChallengeStore.TryVerify(mobile, request.Otp, DateTimeOffset.UtcNow, out var userId))
             {
@@ -92,13 +100,18 @@ namespace TenderManagement.Application.Services
                 throw new UnauthorizedAccessException(InvalidOtpMessage);
             }
 
-            var role = await _unitOfWork.Roles.GetByIdAsync(user.RoleId, cancellationToken);
-            if (role is null || !role.IsActive)
+            var role = user.RoleId.HasValue
+                ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value, cancellationToken)
+                : null;
+            if (user.AccountType == "Internal" && (role is null || !role.IsActive) ||
+                user.AccountType == "ExternalBidder" && user.RoleId.HasValue ||
+                user.AccountType is not ("Internal" or "ExternalBidder"))
             {
                 throw new UnauthorizedAccessException(InvalidOtpMessage);
             }
 
-            var (token, expiresAt) = _jwtTokenService.GenerateToken(user, role.RoleName);
+            var roleName = role?.RoleName ?? RoleNames.ExternalBidder;
+            var (token, expiresAt) = _jwtTokenService.GenerateToken(user, roleName);
             await _auditService.LogAsync(user.UserId, "Login", nameof(User), user.UserId,
                 cancellationToken: cancellationToken);
 
@@ -109,12 +122,13 @@ namespace TenderManagement.Application.Services
                 UserId = user.UserId,
                 FullName = user.FullName,
                 Email = user.Email,
-                Role = role.RoleName,
+                Role = roleName,
+                AccountType = user.AccountType,
                 DepartmentId = user.DepartmentId
             };
         }
 
-        public async Task<AuthResponseDto> RegisterAsync(
+        public async Task<RegisterResponseDto> RegisterAsync(
             RegisterRequestDto request, CancellationToken cancellationToken)
         {
             if (!request.TermsAccepted)
@@ -129,26 +143,23 @@ namespace TenderManagement.Application.Services
                 throw new BusinessRuleException("A user with this email already exists.");
             }
 
-            var role = await _unitOfWork.Roles.GetByIdAsync(request.RoleId, cancellationToken)
-                ?? throw new NotFoundException(nameof(Role), request.RoleId);
-
-            if (!string.Equals(role.RoleName, RoleNames.Contractor, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new BusinessRuleException(
-                    "Public self-registration is only available for the Contractor/Vendor role. " +
-                    "Staff accounts must be provisioned by an administrator.");
-            }
-
             var mobile = NormalizeMobile(request.Mobile)
                 ?? throw new BusinessRuleException("Enter a valid Indian mobile number.");
+            var duplicateMobile = await _unitOfWork.Users.FindAsync(
+                user => user.Mobile == mobile && user.IsActive, cancellationToken);
+            if (duplicateMobile.Any())
+                throw new BusinessRuleException("An account already uses this mobile number.");
+
             var user = new User
             {
                 Email = request.Email,
                 Mobile = mobile,
                 FullName = request.FullName,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                RoleId = role.RoleId,
-                DepartmentId = request.DepartmentId ?? 1,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                    Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))),
+                AccountType = "ExternalBidder",
+                RoleId = null,
+                DepartmentId = null,
                 IsActive = true
             };
 
@@ -172,17 +183,9 @@ namespace TenderManagement.Application.Services
             await _auditService.LogAsync(user.UserId, "AcceptRegistrationTerms", nameof(User), user.UserId,
                 "Portal terms v1", cancellationToken);
 
-            var (token, expiresAt) = _jwtTokenService.GenerateToken(user, role.RoleName);
-            return new AuthResponseDto
-            {
-                Token = token,
-                ExpiresAt = expiresAt,
-                UserId = user.UserId,
-                FullName = user.FullName,
-                Email = user.Email,
-                Role = role.RoleName,
-                DepartmentId = user.DepartmentId
-            };
+            return new RegisterResponseDto(
+                user.UserId,
+                "Registration complete. Sign in with your 10-digit mobile number and one-time code.");
         }
 
         private static string? NormalizeMobile(string? mobile)
@@ -206,5 +209,11 @@ namespace TenderManagement.Application.Services
                 ? digits
                 : null;
         }
+
+        private static string? NormalizeLoginMobile(string? mobile) =>
+            mobile is { Length: 10 } &&
+            mobile.All(character => character is >= '0' and <= '9')
+                ? mobile
+                : null;
     }
 }

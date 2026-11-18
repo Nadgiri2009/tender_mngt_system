@@ -9,6 +9,7 @@ import { Menu, X, LogOut, LayoutDashboard, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ROLE_NAMES } from "@/types/auth";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -68,21 +69,21 @@ export function Navbar() {
         <div className="hidden items-center gap-3 lg:flex">
           {isAuthenticated ? (
             <>
-              {pathname !== "/" && user?.role !== "Contractor" && (
+              {pathname !== "/" && user?.role !== ROLE_NAMES.ExternalBidder && (
                 <Button asChild variant="outline" size="sm">
                   <Link href="/approvals">
                     <ClipboardCheck className="mr-1 h-4 w-4" /> My Approvals
                   </Link>
                 </Button>
               )}
-              {user?.role !== "Admin" && (
+              {user?.role !== ROLE_NAMES.JuniorEngineer && (
                 <Button asChild variant="outline" size="sm">
                   <Link href="/dashboard">
                     <LayoutDashboard className="mr-1 h-4 w-4" /> Dashboard
                   </Link>
                 </Button>
               )}
-              {user?.role === "Admin" && (
+              {user?.role === ROLE_NAMES.JuniorEngineer && (
                 <Button asChild variant="outline" size="sm">
                   <Link href="/admin">
                     <LayoutDashboard className="mr-1 h-4 w-4" /> Admin Panel
@@ -133,19 +134,19 @@ export function Navbar() {
             <div className="mt-2 flex flex-col gap-2 border-t border-border pt-3">
               {isAuthenticated ? (
                 <>
-                  {pathname !== "/" && user?.role !== "Contractor" && (
+                  {pathname !== "/" && user?.role !== ROLE_NAMES.ExternalBidder && (
                     <Button asChild variant="outline" size="sm">
                       <Link href="/approvals" onClick={() => setMobileOpen(false)}>
                         My Approvals
                       </Link>
                     </Button>
                   )}
-                  {user?.role !== "Admin" && (
+                  {user?.role !== ROLE_NAMES.JuniorEngineer && (
                     <Button asChild variant="outline" size="sm">
                       <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
                     </Button>
                   )}
-                  {user?.role === "Admin" && (
+                  {user?.role === ROLE_NAMES.JuniorEngineer && (
                     <Button asChild variant="outline" size="sm">
                       <Link href="/admin" onClick={() => setMobileOpen(false)}>
                         Admin Panel

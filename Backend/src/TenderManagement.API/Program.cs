@@ -1,10 +1,12 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using TenderManagement.API.Middleware;
 using TenderManagement.API.Services;
+using TenderManagement.API.Authorization;
 using TenderManagement.Application.Interfaces;
 using TenderManagement.Application.Services;
 using TenderManagement.Infrastructure.Data;
@@ -117,7 +119,7 @@ builder.Services.AddScoped<IFileStorageService>(sp =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<IAuthOtpChallengeStore, InMemoryAuthOtpChallengeStore>();
-builder.Services.AddSingleton<IAuthOtpDeliveryService, DevelopmentConsoleOtpDeliveryService>();
+builder.Services.AddSingleton<IAuthOtpDeliveryService, DevelopmentOtpDeliveryService>();
 builder.Services.AddScoped<ITenderService, TenderService>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IBidService, BidService>();
@@ -171,7 +173,16 @@ builder.Services.AddAuthentication(options =>
 });
 
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("users.manage", policy =>
+        policy.Requirements.Add(new PermissionRequirement("users.manage")));
+    options.AddPolicy("masterdata.manage", policy =>
+        policy.Requirements.Add(new PermissionRequirement("masterdata.manage")));
+    options.AddPolicy("roles.manage", policy =>
+        policy.Requirements.Add(new PermissionRequirement("roles.manage")));
+});
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 
 // ---------------------------------------------------------------------------

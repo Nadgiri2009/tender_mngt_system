@@ -1,5 +1,9 @@
 # SMC Tender Management Portal — Master Documentation
 
+> **Current four-role status:** See [SMC Four-Role Implementation Status](./Database/SMC_FOUR_ROLE_IMPLEMENTATION_STATUS.md).
+> Sections below contain historical inventory and prior workflow descriptions;
+> they are not authoritative for the current role catalog or completion status.
+
 **Inventory snapshot:** 17 November 2026
 **Database inspected:** `TenderManagementDB` on `localhost\SQLEXPRESS02`
 **Status:** This document describes the inspected source and local database. It does not assert that all workflow stages are implemented or deployment-ready.
@@ -72,7 +76,7 @@ The Web Forms module uses `ModulePage`/`ModuleDb`, parameterized ADO.NET, code-b
 
 ### ASP.NET Core API
 
-The Next.js/API sign-in now requests a six-digit mobile OTP at `/api/auth/request-otp` and verifies it at `/api/auth/login`. Codes expire after five minutes, are single-use, and are limited to three requests per 15 minutes and five verification attempts. In local Development, the randomly generated code is logged by the API; no fixed OTP is used. Production and non-local requests currently return `503`; no SMS provider is implemented. The in-memory challenge store is for single-instance development only.
+The Next.js/API sign-in accepts exactly ten digits, requests a six-digit OTP at `/api/auth/request-otp`, and verifies it at `/api/auth/login`. Codes expire after five minutes, are single-use, and are limited to three requests per 15 minutes and five verification attempts. For an eligible localhost request in Development, the randomly generated code is returned as `developmentOtp` and displayed on the login page; it is not written to the API console. No fixed OTP is used. Production and non-local requests currently return `503`; no SMS provider is implemented. The in-memory challenge store is for single-instance development only.
 
 Contractor self-registration still requires email/password and remains restricted by `AuthService` to the legacy `Contractor` role. API authorization still uses legacy `[Authorize(Roles = "...")]` role claims; it does not yet evaluate `Permissions`/`RolePermissions`. Do not assume the Web Forms permission mappings automatically authorize API endpoints.
 
@@ -110,7 +114,7 @@ The six role definitions exist and are active in the inspected database. **None 
 
 ### Separate `tender_tracking` target database
 
-The requested `tender_tracking` database was created separately; `TenderManagementDB` was not modified. It contains the four requested active role definitions and 33 role-permission mappings copied from the corresponding existing workflow roles. Four disabled placeholder user rows were also created because real phone numbers have not yet been provided. Their login identifiers are invalid dummy values (`0000000001` through `0000000004`), their email addresses use the reserved `.invalid` domain, and their password hashes were generated from discarded random values. These rows cannot sign in; replace each mobile number with a verified number and activate the account only when ready. No real OTP or login credential is available for these placeholders.
+The requested `tender_tracking` database was created separately; `TenderManagementDB` was not modified. It contains the four requested active role definitions and 31 role-permission mappings. Four placeholder user rows were created because verified phone numbers were not available. The Junior Engineer (JE) development placeholder (`0000000001`) is enabled for local OTP testing only; its randomly generated OTP is returned in the local Development login response and shown on the login page. The other three placeholders (`0000000002` through `0000000004`) remain disabled. All use reserved `.invalid` email addresses and unusable random password hashes. These are not real phone numbers; replace them with verified numbers before production and never enable the dummy accounts in production.
 
 ### All existing user accounts
 
@@ -148,7 +152,7 @@ boundary; every page action, postback, direct URL, and document download must be
 
 ## 10. Department-Level Restrictions
 
-- JE access requires the tender's department to match the JE's active department assignment and the current workflow assignment.
+- Junior Engineer (JE) access requires the tender's department to match the Junior Engineer (JE)'s active department assignment and the current workflow assignment.
 - Tender Cell, Samiti, and Chief Auditor access requires a matching assigned workflow queue; role possession alone is insufficient.
 - DepartmentOfficer version-1 lists and unpublished records are scoped to their own `CreatedBy` tenders; published public notices remain readable.
 - Contractor access is limited to their own linked contractor profile, bids, documents, and shortfalls.
@@ -168,25 +172,25 @@ Web Forms registration accepts verified mobile OTP, name, and email and creates 
 Two status/workflow tracks coexist:
 
 - **Version 1 / API legacy:** `Draft` through pre-publication approvals, bid/evaluation stages, and post-award work, billing, and payment.
-- **Version 2 / Web Forms:** separate `WorkflowVersion=2` stages, explicit assignment-based queues, JE primary review, intended Tender Cell/shortfall/financial approval chain, and intended Work Order/Agreement completion.
+- **Version 2 / Web Forms:** separate `WorkflowVersion=2` stages, explicit assignment-based queues, Junior Engineer (JE) primary review, intended Tender Cell/shortfall/financial approval chain, and intended Work Order/Agreement completion.
 
 Do not treat the presence of version-2 tables or stage rows as proof that the corresponding pages and server actions are complete.
 
 ## 14. Version-2 Tender Creation
 
-JE creates a version-2 tender for the assigned department using the existing `Tender` record (`WorkflowVersion=2`), not a parallel tender table. The workflow retains budget and technical-sanction data, pre-bid meeting fields, a scheduled technical opening field, and a required bidder-document checklist. Existing tenders remain version 1. Current local records: 29 tenders, all version 1.
+Junior Engineer (JE) creates a version-2 tender for the assigned department using the existing `Tender` record (`WorkflowVersion=2`), not a parallel tender table. The workflow retains budget and technical-sanction data, pre-bid meeting fields, a scheduled technical opening field, and a required bidder-document checklist. Existing tenders remain version 1. Current local records: 29 tenders, all version 1.
 
-The legacy API's `CreateTenderDto` documents a title length of 5–250 characters, description up to 4,000 characters, positive department ID, estimated amount greater than 0.01, tender type up to 50 characters, optional submission deadline, and supporting document uploads. The legacy API path is distinct from JE version-2 intake and its authorization rules; do not assume these DTO constraints are all enforced by the Web Forms form.
+The legacy API's `CreateTenderDto` documents a title length of 5–250 characters, description up to 4,000 characters, positive department ID, estimated amount greater than 0.01, tender type up to 50 characters, optional submission deadline, and supporting document uploads. The legacy API path is distinct from Junior Engineer (JE) version-2 intake and its authorization rules; do not assume these DTO constraints are all enforced by the Web Forms form.
 
-## 15. JE Draft Submission
+## 15. Junior Engineer (JE) Draft Submission
 
-The JE submission gate requires the established tender pack, including a BOQ item, required tender-document categories, and at least one configured required bidder-document type. The legacy preparation pack requires the four categories **Tender Proposal**, **Tender Document**, **Technical Supporting Document**, and **Financial Supporting Document**, plus at least one BOQ item before it can be forwarded. Draft BOQ edits are limited to Draft; the legacy application restricts draft edit/soft-delete to Admin and scopes DepartmentOfficer data to the officer's own `CreatedBy` tenders. Submission and workflow history use the same Tender ID and transactions. The version-2 draft submission and required-document configuration are implemented; end-to-end testing with a version-2 JE account has not been performed.
+The Junior Engineer (JE) submission gate requires the established tender pack, including a BOQ item, required tender-document categories, and at least one configured required bidder-document type. The legacy preparation pack requires the four categories **Tender Proposal**, **Tender Document**, **Technical Supporting Document**, and **Financial Supporting Document**, plus at least one BOQ item before it can be forwarded. Draft BOQ edits are limited to Draft; the legacy application restricts draft edit/soft-delete to Admin and scopes DepartmentOfficer data to the officer's own `CreatedBy` tenders. Submission and workflow history use the same Tender ID and transactions. The version-2 draft submission and required-document configuration are implemented; end-to-end testing with a version-2 Junior Engineer (JE) account has not been performed.
 
 ## 16. Tender Publication Scheduling
 
 Legacy publication scheduling records UTC start, original/current close, duration, approver, remarks, and modification time. The CAFO/Admin schedule procedure requires a published tender, a future valid period, no existing opening/bids, and applicable department checks. Extension requests are limited to three approved requests, require supporting files/reason, and are reviewed by CAFO/Admin. The public tender list exposes scheduled published notices only.
 
-Version-2 publication scheduling is available through the JE workflow. Do not equate publication approval/status with the separate schedule dates.
+Version-2 publication scheduling is available through the Junior Engineer (JE) workflow. Do not equate publication approval/status with the separate schedule dates.
 
 ## 17. Pre-Bid Meeting Management
 
@@ -194,30 +198,30 @@ Tender stores `PreBidMeetingUtc`, `PreBidLocation`, and `PreBidDetails` for vers
 
 ## 18. Initial Tender Opening
 
-This is the initial technical/eligibility opening, not financial bid opening. The legacy lifecycle procedure enforces the approved publication closing time, single opening record, actual UTC timestamp, user, operator, designation, and remarks, then makes evaluation eligible after the configured delay. The version-2 JE opening waits until the publication window closes and transitions to primary verification. Bid amounts must remain hidden at this stage.
+This is the initial technical/eligibility opening, not financial bid opening. The legacy lifecycle procedure enforces the approved publication closing time, single opening record, actual UTC timestamp, user, operator, designation, and remarks, then makes evaluation eligible after the configured delay. The version-2 Junior Engineer (JE) opening waits until the publication window closes and transitions to primary verification. Bid amounts must remain hidden at this stage.
 
-## 19. JE Primary Verification
+## 19. Junior Engineer (JE) Primary Verification
 
 Implemented in the Web Forms version-2 queue, subject to end-to-end verification:
 
 - Contractors upload validated technical documents under generated server paths and document types configured for the tender.
-- JE reviews bidders and each uploaded document separately, records decisions/remarks/user/timestamp, and records missing required types as not verified.
+- Junior Engineer (JE) reviews bidders and each uploaded document separately, records decisions/remarks/user/timestamp, and records missing required types as not verified.
 - Completion is blocked until every bidder and required document has a decision; forwarding is gated on completion.
-- The JE verification page does not query or expose financial bids.
+- The Junior Engineer (JE) verification page does not query or expose financial bids.
 
 Migration 11 adds `TechnicalBidDocuments.DocumentType` and nullable `UploadedBy`; migration 12 creates `TenderRequiredBidDocuments`.
 
 ## 20. Tender Cell Secondary Verification
 
-The schema and version-2 workflow stages exist, including `TenderVerificationReviews` and document-wise history. Tender Cell must independently review each bidder/document, inspect JE results and remarks, and either approve or start a shortfall. **The Tender Cell UI/action implementation remains pending**; do not mark secondary verification complete based on schema alone.
+The schema and version-2 workflow stages exist, including `TenderVerificationReviews` and document-wise history. Tender Cell must independently review each bidder/document, inspect Junior Engineer (JE) results and remarks, and either approve or start a shortfall. **The Tender Cell UI/action implementation remains pending**; do not mark secondary verification complete based on schema alone.
 
 ## 21. Shortfall Management
 
 The schema supports multiple shortfall items per bidder, descriptions, corrective action, configurable positive submission duration/deadline, history, and status. No unverified number of days should be hardcoded. Shortfall generation and contractor response/clearance actions are **pending implementation**.
 
-## 22. JE Shortfall Approval
+## 22. Junior Engineer (JE) Shortfall Approval
 
-Migration 10 defines a JE approval stage and stores approval user/time. Only an approved shortfall is intended to be released to a contractor. JE approval/rejection UI, transition validation, and assignment scoping remain pending.
+Migration 10 defines a Junior Engineer (JE) approval stage and stores approval user/time. Only an approved shortfall is intended to be released to a contractor. Junior Engineer (JE) approval/rejection UI, transition validation, and assignment scoping remain pending.
 
 ## 23. Contractor Document Submission
 
@@ -231,19 +235,19 @@ The database can retain submissions and clearance/continued-deficiency status. T
 
 The intended queue only accepts tenders after primary and secondary review and all shortfalls are cleared. It records approval/rejection, actor, role, timestamp, and remarks. Database structures and stages exist; Samiti approval UI and server workflow actions remain pending. A rejected opening must return through an explicit review path rather than proceed automatically.
 
-## 26. JE Financial Bid Opening
+## 26. Junior Engineer (JE) Financial Bid Opening
 
-Financial opening is separate from the initial technical opening. Migration 10 defines `TenderFinancialBidOpening`, bidder-level `TenderFinancialBidOpeningDetails`, and supporting documents. Only Samiti-approved tenders should be opened; the JE records actual opening time/operator/remarks and bidder quoted amounts before sending to Chief Auditor. These actions remain pending implementation.
+Financial opening is separate from the initial technical opening. Migration 10 defines `TenderFinancialBidOpening`, bidder-level `TenderFinancialBidOpeningDetails`, and supporting documents. Only Samiti-approved tenders should be opened; the Junior Engineer (JE) records actual opening time/operator/remarks and bidder quoted amounts before sending to Chief Auditor. These actions remain pending implementation.
 
 ## 27. Chief Auditor Final Financial Approval
 
-The intended Chief Auditor queue contains only JE-submitted financial openings and includes tender, estimate, bidder amounts, and supporting evidence. The decision must be append-only and capture user, time, remarks, and approved amount/document where applicable. Approval/return workflow and enforcement are pending; JE cannot generate final documents before approval.
+The intended Chief Auditor queue contains only Junior Engineer (JE)-submitted financial openings and includes tender, estimate, bidder amounts, and supporting evidence. The decision must be append-only and capture user, time, remarks, and approved amount/document where applicable. Approval/return workflow and enforcement are pending; Junior Engineer (JE) cannot generate final documents before approval.
 
-## 28. JE Work Order Generation
+## 28. Junior Engineer (JE) Work Order Generation
 
 Version-2 work-order table extensions and `TenderGeneratedDocuments` support approved amount, work description, terms, signatory, and versioned generated files. Dedicated draft/finalize/PDF preview/download/history operations are pending. Existing version-1 `WorkManagement.aspx` functionality must remain distinct and intact.
 
-## 29. JE Tender Agreement Generation
+## 29. Junior Engineer (JE) Tender Agreement Generation
 
 Version-2 agreement extensions and generated-document history support agreement number/date, approved amount, terms, and version numbers. The new final-approval-gated generation/PDF/versioning flow remains pending. Do not overwrite finalized versions or use fabricated tender/contractor/amount data.
 
@@ -294,27 +298,27 @@ The migration-10 version-2 stage map, including the configured role and approve/
 
 | Order | Stage | Role | Pending → approve status | Reject status |
 |---:|---|---|---|---|
-| 101 | Final_JE_SubmitTender | JE | Draft → Submitted | Draft |
-| 102 | Final_JE_PublishTender | JE | Submitted → Tender Published | Submitted |
-| 103 | Final_JE_OpenTechnicalBids | JE | Tender Published → Primary Verification Pending | Tender Published |
-| 104 | Final_JE_CompletePrimaryVerification | JE | Primary Verification Pending → Primary Verification Completed | Primary Verification Pending |
-| 105 | Final_JE_ForwardToTenderCell | JE | Primary Verification Completed → Tender Cell Verification Pending | Primary Verification Completed |
+| 101 | Final_JE_SubmitTender | Junior Engineer (JE) | Draft → Submitted | Draft |
+| 102 | Final_JE_PublishTender | Junior Engineer (JE) | Submitted → Tender Published | Submitted |
+| 103 | Final_JE_OpenTechnicalBids | Junior Engineer (JE) | Tender Published → Primary Verification Pending | Tender Published |
+| 104 | Final_JE_CompletePrimaryVerification | Junior Engineer (JE) | Primary Verification Pending → Primary Verification Completed | Primary Verification Pending |
+| 105 | Final_JE_ForwardToTenderCell | Junior Engineer (JE) | Primary Verification Completed → Tender Cell Verification Pending | Primary Verification Completed |
 | 106 | Final_Cell_CompleteSecondaryVerification | Tender Cell | Tender Cell Verification Pending → Financial Bid Opening Approval Pending | Tender Cell Verification Pending |
-| 107 | Final_Cell_CreateShortfall | Tender Cell | Tender Cell Verification Pending → Shortfall Pending JE Approval | Tender Cell Verification Pending |
-| 108 | Final_JE_ApproveShortfall | JE | Shortfall Pending JE Approval → Awaiting Contractor Submission | Tender Cell Verification Pending |
+| 107 | Final_Cell_CreateShortfall | Tender Cell | Tender Cell Verification Pending → Shortfall Pending Junior Engineer (JE) Approval | Tender Cell Verification Pending |
+| 108 | Final_JE_ApproveShortfall | Junior Engineer (JE) | Shortfall Pending Junior Engineer (JE) Approval → Awaiting Contractor Submission | Tender Cell Verification Pending |
 | 109 | Final_Contractor_SubmitShortfall | Contractor / Vendor | Awaiting Contractor Submission → Shortfall Documents Submitted | Awaiting Contractor Submission |
 | 110 | Final_Cell_ClearShortfall | Tender Cell | Shortfall Documents Submitted → Shortfall Cleared | Awaiting Contractor Submission |
 | 111 | Final_Cell_ResumeVerification | Tender Cell | Shortfall Cleared → Tender Cell Verification Pending | Shortfall Cleared |
 | 112 | Final_Samiti_ApproveFinancialOpening | Samiti Adhyaksha | Financial Bid Opening Approval Pending → Financial Bid Opening Approved | Financial Bid Opening Rejected |
 | 113 | Final_Cell_ReverifyRejectedOpening | Tender Cell | Financial Bid Opening Rejected → Tender Cell Verification Pending | Financial Bid Opening Rejected |
-| 114 | Final_JE_OpenFinancialBids | JE | Financial Bid Opening Approved → Final Financial Approval Pending | Financial Bid Opening Approved |
+| 114 | Final_JE_OpenFinancialBids | Junior Engineer (JE) | Financial Bid Opening Approved → Final Financial Approval Pending | Financial Bid Opening Approved |
 | 115 | Final_Auditor_ApproveFinancialBids | Chief Auditor | Final Financial Approval Pending → Final Financial Approval Completed | Final Financial Approval Rejected |
-| 116 | Final_JE_ResubmitFinancialApproval | JE | Final Financial Approval Rejected → Final Financial Approval Pending | Final Financial Approval Rejected |
-| 117 | Final_JE_StartWorkOrder | JE | Final Financial Approval Completed → Work Order Pending | Final Financial Approval Completed |
-| 118 | Final_JE_GenerateWorkOrder | JE | Work Order Pending → Work Order Generated | Work Order Pending |
-| 119 | Final_JE_StartAgreement | JE | Work Order Generated → Tender Agreement Pending | Work Order Generated |
-| 120 | Final_JE_GenerateAgreement | JE | Tender Agreement Pending → Tender Agreement Generated | Tender Agreement Pending |
-| 121 | Final_JE_CompleteTender | JE | Tender Agreement Generated → Completed | Tender Agreement Generated |
+| 116 | Final_JE_ResubmitFinancialApproval | Junior Engineer (JE) | Final Financial Approval Rejected → Final Financial Approval Pending | Final Financial Approval Rejected |
+| 117 | Final_JE_StartWorkOrder | Junior Engineer (JE) | Final Financial Approval Completed → Work Order Pending | Final Financial Approval Completed |
+| 118 | Final_JE_GenerateWorkOrder | Junior Engineer (JE) | Work Order Pending → Work Order Generated | Work Order Pending |
+| 119 | Final_JE_StartAgreement | Junior Engineer (JE) | Work Order Generated → Tender Agreement Pending | Work Order Generated |
+| 120 | Final_JE_GenerateAgreement | Junior Engineer (JE) | Tender Agreement Pending → Tender Agreement Generated | Tender Agreement Pending |
+| 121 | Final_JE_CompleteTender | Junior Engineer (JE) | Tender Agreement Generated → Completed | Tender Agreement Generated |
 
 This is the migration's configured transition map, not a claim that all listed actions have application handlers. Sections 20–29 distinguish implemented and pending UI/server behavior.
 
@@ -512,14 +516,14 @@ complete version-2 workflow test was performed. Database rehearsals do not estab
 readiness. Workflow-status CRUD is not available: transitions remain deployment-controlled because
 they are coupled to server-side authorization and transition rules.
 
-Recommended test matrix: cross-department JE; unassigned Tender Cell/Samiti/Auditor; contractor ownership; direct URL and forged POST; role changes; duplicate opening/approval; missing/late shortfall document; financial visibility gate; document path traversal; session expiry; OTP limits; workflow concurrency; file validation; generated PDFs against actual database data; and backup/restore plus upgrade rehearsal.
+Recommended test matrix: cross-department Junior Engineer (JE); unassigned Tender Cell/Samiti/Auditor; contractor ownership; direct URL and forged POST; role changes; duplicate opening/approval; missing/late shortfall document; financial visibility gate; document path traversal; session expiry; OTP limits; workflow concurrency; file validation; generated PDFs against actual database data; and backup/restore plus upgrade rehearsal.
 
 ## 41. Pending Implementation
 
 - Tender Cell secondary verification UI/actions.
-- Shortfall creation, JE approval, contractor upload, Tender Cell clearance/continued-deficiency history, and notification behavior.
+- Shortfall creation, Junior Engineer (JE) approval, contractor upload, Tender Cell clearance/continued-deficiency history, and notification behavior.
 - Samiti financial-opening approval/rejection.
-- JE financial opening and bidder-wise details/documents.
+- Junior Engineer (JE) financial opening and bidder-wise details/documents.
 - Chief Auditor approval/return and strict precondition enforcement.
 - Version-2 Work Order and Tender Agreement draft/finalize/PDF/version/history features.
 - Safe administrative CRUD for workflow statuses and system configuration values; these remain
@@ -553,8 +557,8 @@ After business approval and testing: implement remaining version-2 stages, an ap
 | The retired `DatabaseSetup.sql` inserted development accounts and business data. | It is archived outside the active project. The canonical setup omits all user/department/contractor/tender/bid/transaction records; Super Admin provisioning remains a separate trusted process. |
 | Historical docs say there were nine/ten legacy roles or refer to role IDs by number; migration 10 and the live DB show 18 role definitions and role IDs are database-generated. | Use role names and live role mappings, not hardcoded IDs. The six version-2 roles coexist with legacy roles. |
 | Older implementation notes give tender-type values `Open/Restricted/Negotiated`; the current API enum is `Open/Limited/Single/EOI`; the pre-consolidation SQL lookup list was `Works/Goods/Services/Consultancy`. | These are three distinct vocabularies in separate layers. Do not silently normalize or seed one into another; confirm the intended mapping with the business owner before changing API/UI/database behavior. Fresh installs leave configurable catalogs empty. |
-| An older implementation summary describes API tender CRUD as Admin-only, while version-2 Web Forms intake assigns tender creation to the department's JE. | These are different application/workflow paths. Preserve their existing authorization boundaries until a deliberate parity decision is approved; the front-end guard alone is not security enforcement. |
-| Historical analysis/SOP text lists different opening actors and stage ordering; migration 09's SQL authorization checks currently allow CAFO/TenderCommittee/TenderSection/Admin to open legacy bids, and `TenderEvaluation.aspx.cs` calls its stored procedure. | Treat the current SQL procedure as the supported legacy implementation when installed. Keep this separate from version-2 JE opening and note that the local DB is missing that procedure. |
+| An older implementation summary describes API tender CRUD as Admin-only, while version-2 Web Forms intake assigns tender creation to the department's Junior Engineer (JE). | These are different application/workflow paths. Preserve their existing authorization boundaries until a deliberate parity decision is approved; the front-end guard alone is not security enforcement. |
+| Historical analysis/SOP text lists different opening actors and stage ordering; migration 09's SQL authorization checks currently allow CAFO/TenderCommittee/TenderSection/Admin to open legacy bids, and `TenderEvaluation.aspx.cs` calls its stored procedure. | Treat the current SQL procedure as the supported legacy implementation when installed. Keep this separate from version-2 Junior Engineer (JE) opening and note that the local DB is missing that procedure. |
 | Older documentation describes a one-day legacy evaluation delay while version-2 shortfall duration is required to be configurable. | `TenderEvaluationSettings.StartDelayDays` has no seeded value. An administrator must save a delay in the Web Forms evaluation page before bid opening; the page inserts or updates the setting. Version-2 shortfall duration belongs on each shortfall and must not use a fixed duration. |
 | Historical migration 04 adds `Departments.HeadOfficerName` only inside the branch that creates Announcements. | The canonical installer defines/checks the objects independently and refuses unsupported upgrades rather than relying on the retired script's branch behavior. |
 | `docx/WORKFLOW_ANALYSIS_vs_PDF.md` and older status reports describe bugs/features as pending that later status documents say were fixed or implemented. | The current code is the latest authority where verified; historical reports are preserved as sources but their old findings are not presented as current behavior. |

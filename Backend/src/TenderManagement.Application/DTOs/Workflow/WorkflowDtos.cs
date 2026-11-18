@@ -11,6 +11,12 @@ namespace TenderManagement.Application.DTOs.Workflow
         public string? Remarks { get; set; }
     }
 
+    /// <summary>Remarks recorded when a configured workflow action is executed.</summary>
+    public sealed record WorkflowActionRequest
+    {
+        public string? Remarks { get; init; }
+    }
+
     public class ApproveRejectDto
     {
         public string ApprovalStage { get; set; } = string.Empty;
@@ -39,6 +45,7 @@ namespace TenderManagement.Application.DTOs.Workflow
         public decimal EstimatedAmount { get; set; }
         public string DepartmentName { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; }
+        public List<string> AvailableActions { get; set; } = new();
     }
 
     public class WorkflowStepDto
@@ -50,6 +57,13 @@ namespace TenderManagement.Application.DTOs.Workflow
         public string? DepartmentName { get; set; }
         public bool IsCurrent { get; set; }
     }
+
+    /// <summary>A workflow action available for the current tender status and authenticated role.</summary>
+    public sealed record WorkflowActionOptionDto(
+        string ActionName,
+        string StageName,
+        string FromStatus,
+        string ToStatus);
 
     public class DashboardStatsDto
     {

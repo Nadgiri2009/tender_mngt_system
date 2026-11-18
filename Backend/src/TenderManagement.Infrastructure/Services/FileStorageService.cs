@@ -1,4 +1,5 @@
 using TenderManagement.Application.Interfaces;
+using TenderManagement.Application.Common;
 
 namespace TenderManagement.Infrastructure.Services
 {
@@ -18,8 +19,7 @@ namespace TenderManagement.Infrastructure.Services
         public async Task<(string FileName, string FilePath)> SaveFileAsync(Stream fileStream, string originalFileName, string subFolder)
         {
             var safeExtension = Path.GetExtension(originalFileName);
-            var allowedExtensions = new[] { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png" };
-            if (!allowedExtensions.Contains(safeExtension.ToLowerInvariant()))
+            if (!DocumentUploadRules.AllowedExtensions.Contains(safeExtension))
             {
                 throw new Application.Common.BusinessRuleException($"File type '{safeExtension}' is not permitted.");
             }

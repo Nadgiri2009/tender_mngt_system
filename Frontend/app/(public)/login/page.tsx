@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 const mobileSchema = z.object({
-  mobile: z.string().trim().min(10, "Enter a valid mobile number").max(18, "Enter a valid mobile number"),
+  mobile: z.string().regex(/^\d{10}$/, "Enter a 10-digit mobile number"),
 });
 
 const otpSchema = z.object({
@@ -36,6 +36,7 @@ export default function LoginPage() {
   const { setSession } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [activeMobile, setActiveMobile] = useState("");
+  const [developmentOtp, setDevelopmentOtp] = useState<string | null>(null);
   const [step, setStep] = useState<"mobile" | "otp">("mobile");
 
   const mobileForm = useForm<MobileFormValues>({
@@ -51,6 +52,7 @@ export default function LoginPage() {
     mutationFn: requestLoginOtp,
     onSuccess: (response, input) => {
       setActiveMobile(input.mobile);
+      setDevelopmentOtp(response.developmentOtp ?? null);
       setStep("otp");
       otpForm.reset();
       setServerError(null);
@@ -64,9 +66,12 @@ export default function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: loginApi,
     onSuccess: (auth) => {
-      setSession(auth);
+      if (!setSession(auth)) {
+        setServerError("The sign-in response was invalid or expired. Please request a new code.");
+        return;
+      }
       toast.success(`Welcome back, ${auth.fullName}.`);
-      router.replace(getAuthReturnUrl() ?? (auth.role === "Admin" ? "/admin" : "/dashboard"));
+      router.replace(getAuthReturnUrl() ?? (auth.role === "Junior Engineer (JE)" ? "/admin" : "/dashboard"));
     },
     onError: (error: ApiError) => {
       setServerError(error.message || "Login failed.");
@@ -75,6 +80,7 @@ export default function LoginPage() {
 
   const requestCode = mobileForm.handleSubmit((values) => {
     setServerError(null);
+    setDevelopmentOtp(null);
     requestOtpMutation.mutate(values);
   });
 
@@ -101,9 +107,16 @@ export default function LoginPage() {
                 <Input
                   id="mobile"
                   type="tel"
-                  autoComplete="tel"
-                  inputMode="tel"
-                  {...mobileForm.register("mobile")}
+                  autoComplete="tel-national"
+                  inputMode="numeric"
+                  maxLength={10}
+                  pattern="[0-9]{10}"
+                  placeholder="10-digit mobile number"
+                  {...mobileForm.register("mobile", {
+                    onChange: (event) => {
+                      event.target.value = event.target.value.replace(/\D/g, "").slice(0, 10);
+                    },
+                  })}
                 />
                 {mobileForm.formState.errors.mobile && (
                   <p className="text-sm text-destructive">{mobileForm.formState.errors.mobile.message}</p>
@@ -127,6 +140,7 @@ export default function LoginPage() {
                     className="text-sm font-medium text-primary hover:underline"
                     onClick={() => {
                       setServerError(null);
+                      setDevelopmentOtp(null);
                       setStep("mobile");
                       otpForm.reset();
                     }}
@@ -151,8 +165,14 @@ export default function LoginPage() {
               </div>
 
               <p className="text-sm text-muted-foreground">
-                If this number is registered, use the code sent to it. In local development, check the API console.
+                If this number is registered, use the code sent to it.
               </p>
+              {developmentOtp && (
+                <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  Development OTP: <strong className="font-mono">{developmentOtp}</strong>
+                  <span className="block text-xs">Visible only for local development.</span>
+                </p>
+              )}
               {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
               <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
@@ -165,6 +185,7 @@ export default function LoginPage() {
                 disabled={requestOtpMutation.isPending}
                 onClick={() => {
                   setServerError(null);
+                  setDevelopmentOtp(null);
                   requestOtpMutation.mutate({ mobile: activeMobile });
                 }}
               >

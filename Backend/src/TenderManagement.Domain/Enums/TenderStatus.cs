@@ -22,6 +22,15 @@ namespace TenderManagement.Domain.Enums
         public const string TenderCommitteeApproval = "Tender Committee Approval";
         public const string PublicationApprovalPending = "Publication Approval Pending";
         public const string TenderPublished = "Tender Published";
+        public const string PrimaryVerificationPending = "Primary Verification Pending";
+        public const string ShortfallPending = "Shortfall Pending";
+        public const string ShortfallDocumentsSubmitted = "Shortfall Documents Submitted";
+        public const string FinancialBidOpeningApprovalPending = "Financial Bid Opening Approval Pending";
+        public const string FinancialBidOpeningApproved = "Financial Bid Opening Approved";
+        public const string FinalFinancialApprovalPending = "Final Financial Approval Pending";
+        public const string FinalFinancialApprovalCompleted = "Final Financial Approval Completed";
+        public const string FinalFinancialApprovalRejected = "Final Financial Approval Rejected";
+        public const string TenderAgreementGenerated = "Tender Agreement Generated";
         public const string TechnicalBidOpening = "Technical Bid Opening";
         public const string TechnicalEvaluation = "Technical Evaluation";
         public const string TechnicalEvaluationApproved = "Technical Evaluation Approved";
@@ -54,7 +63,8 @@ namespace TenderManagement.Domain.Enums
         public static bool IsApproved(string status) =>
             status.Contains("Approved", StringComparison.OrdinalIgnoreCase) ||
             status is TenderStatus.TenderPublished or TenderStatus.FinalApproval or TenderStatus.AgreementCompleted
-                or TenderStatus.WorkOrderGenerated or TenderStatus.WorkStarted or TenderStatus.MeasurementBookUpdated
+                or TenderStatus.WorkOrderGenerated or TenderStatus.TenderAgreementGenerated
+                or TenderStatus.FinalFinancialApprovalCompleted or TenderStatus.WorkStarted or TenderStatus.MeasurementBookUpdated
                 or TenderStatus.PaymentCompleted;
 
         public static bool IsPending(string status) =>
@@ -73,16 +83,23 @@ namespace TenderManagement.Domain.Enums
 
     public static class RoleNames
     {
-        public const string Admin = "Admin";
-        public const string DepartmentOfficer = "DepartmentOfficer";
-        public const string TechnicalSanctionOfficer = "TechnicalSanctionOfficer";
-        public const string TenderSection = "TenderSection";
-        public const string GBOfficer = "GBOfficer";
-        public const string DPDCOfficer = "DPDCOfficer";
-        public const string CAFOOfficer = "CAFOOfficer";
-        public const string MCAOfficer = "MCAOfficer";
-        public const string TenderCommittee = "TenderCommittee";
-        public const string CompetentAuthority = "CompetentAuthority";
-        public const string Contractor = "Contractor";
+        public const string JuniorEngineer = "Junior Engineer (JE)";
+        public const string TenderCell = "Tender Cell";
+        public const string TenderCommitteeChairman = "Tender Committee Chairman (Nivida Samiti Adhyaksha)";
+        public const string DirectorAuditor = "Director Auditor";
+        public const string ExternalBidder = "ExternalBidder";
+        public const string Disabled = "LegacyRoleDisabled";
+
+        public const string Admin = Disabled;
+        public const string DepartmentOfficer = JuniorEngineer;
+        public const string TenderSection = TenderCell;
+        public const string TenderCommittee = TenderCommitteeChairman;
+        public const string CompetentAuthority = DirectorAuditor;
+        public const string Contractor = ExternalBidder;
+        public const string TechnicalSanctionOfficer = Disabled;
+        public const string GBOfficer = Disabled;
+        public const string DPDCOfficer = Disabled;
+        public const string CAFOOfficer = Disabled;
+        public const string MCAOfficer = Disabled;
     }
 }

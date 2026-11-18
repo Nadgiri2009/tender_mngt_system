@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TenderManagement.API.Extensions;
 using TenderManagement.Application.DTOs.Tender;
 using TenderManagement.Application.Interfaces;
 using TenderManagement.Domain.Enums;
@@ -20,11 +21,11 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>POST /api/boq</summary>
         [HttpPost]
-        [Authorize(Roles = $"{RoleNames.DepartmentOfficer},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Create([FromBody] CreateBOQItemDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-            var result = await _tenderService.AddBOQItemAsync(dto);
+            var result = await _tenderService.AddBOQItemAsync(dto, User.GetUserId());
             return Ok(result);
         }
 
@@ -38,20 +39,20 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>PUT /api/boq/{id}</summary>
         [HttpPut("{id:int}")]
-        [Authorize(Roles = $"{RoleNames.DepartmentOfficer},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateBOQItemDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-            var result = await _tenderService.UpdateBOQItemAsync(id, dto);
+            var result = await _tenderService.UpdateBOQItemAsync(id, dto, User.GetUserId());
             return Ok(result);
         }
 
         /// <summary>DELETE /api/boq/{id}</summary>
         [HttpDelete("{id:int}")]
-        [Authorize(Roles = $"{RoleNames.DepartmentOfficer},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Delete(int id)
         {
-            await _tenderService.DeleteBOQItemAsync(id);
+            await _tenderService.DeleteBOQItemAsync(id, User.GetUserId());
             return NoContent();
         }
     }

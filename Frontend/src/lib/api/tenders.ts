@@ -1,4 +1,5 @@
-import { apiClient, getStoredToken, toApiError } from "./client";
+import { apiClient, toApiError } from "./client";
+import { getStoredToken } from "@/lib/authSession";
 import type {
   CreateTenderInput,
   PagedResult,
@@ -70,12 +71,14 @@ export async function fetchTenderById(id: number): Promise<TenderDetail> {
 // deliberate backend design choice to support attaching documents at creation time.
 export async function createTender(
   input: CreateTenderInput,
-  files: File[] = []
+  files: File[] = [],
+  preBidDocument?: File
 ): Promise<TenderDetail> {
   try {
     const formData = new FormData();
     formData.append("tenderJson", JSON.stringify(input));
     files.forEach((file) => formData.append("files", file));
+    if (preBidDocument) formData.append("preBidDocument", preBidDocument);
 
     const { data } = await apiClient.post<TenderDetail>("/tenders", formData, {
       headers: { "Content-Type": "multipart/form-data" },

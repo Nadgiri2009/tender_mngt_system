@@ -21,6 +21,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>POST /api/documents/upload - multipart form: tenderId, documentType, file</summary>
         [HttpPost("upload")]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         [RequestSizeLimit(20_000_000)]
         public async Task<IActionResult> Upload([FromForm] UploadDocumentRequest request)
         {
@@ -34,6 +35,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/documents/{tenderId}</summary>
         [HttpGet("{tenderId:int}")]
+        [Authorize(Roles = $"{RoleNames.JuniorEngineer},{RoleNames.TenderCell},{RoleNames.TenderCommitteeChairman},{RoleNames.DirectorAuditor}")]
         public async Task<IActionResult> GetByTender(int tenderId)
         {
             var result = await _tenderService.GetDocumentsAsync(tenderId);
@@ -42,7 +44,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>DELETE /api/documents/{documentId}</summary>
         [HttpDelete("{documentId:int}")]
-        [Authorize(Roles = $"{RoleNames.DepartmentOfficer},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Delete(int documentId)
         {
             await _tenderService.DeleteDocumentAsync(documentId, User.GetUserId());

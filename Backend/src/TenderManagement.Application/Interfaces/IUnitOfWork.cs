@@ -8,6 +8,8 @@ namespace TenderManagement.Application.Interfaces
         IGenericRepository<Domain.Entities.TenderCategoryMaster> TenderCategories { get; }
         IGenericRepository<Domain.Entities.User> Users { get; }
         IGenericRepository<Domain.Entities.Role> Roles { get; }
+        IGenericRepository<Domain.Entities.Permission> Permissions { get; }
+        IGenericRepository<Domain.Entities.RolePermission> RolePermissions { get; }
         IGenericRepository<Domain.Entities.Department> Departments { get; }
         IGenericRepository<Domain.Entities.Estimate> Estimates { get; }
         IGenericRepository<Domain.Entities.ApprovalHistory> ApprovalHistories { get; }
@@ -25,10 +27,12 @@ namespace TenderManagement.Application.Interfaces
         IGenericRepository<Domain.Entities.Payment> Payments { get; }
         IGenericRepository<Domain.Entities.AuditLog> AuditLogs { get; }
         IGenericRepository<Domain.Entities.WorkflowStage> WorkflowStages { get; }
+        IGenericRepository<Domain.Entities.WorkflowTransition> WorkflowTransitions { get; }
+        IGenericRepository<Domain.Entities.TenderWorkflowAssignment> TenderWorkflowAssignments { get; }
         IGenericRepository<Domain.Entities.Announcement> Announcements { get; }
 
         Task<int> CompleteAsync(CancellationToken cancellationToken = default);
-        Task ExecuteWorkflowTransitionAsync(int tenderId, string approvalStage, string newStatus,
-            string actionStatus, int approvedBy, string? roleAtAction, string? remarks);
+        Task ExecuteWorkflowTransitionAsync(int tenderId, string transitionCode, string expectedStatus,
+            int approvedBy, int roleId, string? remarks);
     }
 }

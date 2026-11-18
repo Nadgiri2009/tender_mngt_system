@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:5050/api
-@mobile = replace-with-an-active-account-mobile
-@otp = replace-with-the-six-digit-code-from-the-development-api-console
+@mobile = 9876543210
+@otp = replace-with-the-six-digit-developmentOtp-from-the-request-response
 
 ### Request a one-time sign-in code
 POST {{baseUrl}}/auth/request-otp

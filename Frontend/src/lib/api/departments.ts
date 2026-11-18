@@ -1,11 +1,33 @@
-import { apiClient, getStoredToken, toApiError } from "./client";
-import type { Department } from "@/types/tender";
+import { apiClient, toApiError } from "./client";
+import { getStoredToken } from "@/lib/authSession";
+import type { Department, PagedResult } from "@/types/tender";
 
 export interface DepartmentInput {
   departmentName: string;
   departmentCode?: string;
   headOfficerName?: string;
   isActive?: boolean;
+}
+
+export interface AdminDepartmentQuery {
+  pageNumber: number;
+  pageSize: number;
+  search?: string;
+}
+
+export async function fetchAdminDepartments(query: AdminDepartmentQuery): Promise<PagedResult<Department>> {
+  try {
+    const { data } = await apiClient.get<PagedResult<Department>>("/departments/paged", {
+      params: {
+        pageNumber: query.pageNumber,
+        pageSize: query.pageSize,
+        search: query.search || undefined,
+      },
+    });
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
 }
 
 export async function fetchDepartments(): Promise<Department[]> {

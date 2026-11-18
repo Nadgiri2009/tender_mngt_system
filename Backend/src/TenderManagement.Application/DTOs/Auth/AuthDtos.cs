@@ -5,51 +5,49 @@ namespace TenderManagement.Application.DTOs.Auth
     /// <summary>Payload for requesting a one-time sign-in code.</summary>
     public sealed record RequestLoginOtpRequestDto
     {
-        [Required, Phone]
+        [Required, RegularExpression(@"^\d{10}$",
+            ErrorMessage = "Enter a 10-digit mobile number.")]
         public required string Mobile { get; init; }
     }
 
-    /// <summary>Generic response returned after a one-time code request.</summary>
-    public sealed record RequestLoginOtpResponseDto(string Message);
+    /// <summary>Response returned after requesting a one-time sign-in code.</summary>
+    public sealed record RequestLoginOtpResponseDto(string Message, string? DevelopmentOtp = null);
 
     /// <summary>Payload for verifying a one-time sign-in code.</summary>
     public sealed record LoginRequestDto
     {
-        [Required, Phone]
+        [Required, RegularExpression(@"^\d{10}$",
+            ErrorMessage = "Enter a 10-digit mobile number.")]
         public required string Mobile { get; init; }
 
         [Required, RegularExpression(@"^\d{6}$")]
         public required string Otp { get; init; }
     }
 
-    public class RegisterRequestDto
+    public sealed record RegisterRequestDto
     {
         [Required, StringLength(150)]
-        public string FullName { get; set; } = string.Empty;
+        public required string FullName { get; init; }
 
         [Required, StringLength(150)]
-        public string CompanyName { get; set; } = string.Empty;
+        public required string CompanyName { get; init; }
 
         [StringLength(300)]
-        public string? Address { get; set; }
+        public string? Address { get; init; }
 
         [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
+        public required string Email { get; init; }
 
-        [Required, Phone]
-        public string Mobile { get; set; } = string.Empty;
-
-        [Required, MinLength(6)]
-        public string Password { get; set; } = string.Empty;
+        [Required, RegularExpression(@"^\d{10}$",
+            ErrorMessage = "Enter a 10-digit mobile number.")]
+        public required string Mobile { get; init; }
 
         [Required]
-        public bool TermsAccepted { get; set; }
-
-        [Required]
-        public int RoleId { get; set; }
-
-        public int? DepartmentId { get; set; }
+        public required bool TermsAccepted { get; init; }
     }
+
+    /// <summary>Response returned after registering an external bidder account.</summary>
+    public sealed record RegisterResponseDto(int UserId, string Message);
 
     public class AuthResponseDto
     {
@@ -59,6 +57,7 @@ namespace TenderManagement.Application.DTOs.Auth
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
+        public string AccountType { get; set; } = string.Empty;
         public int? DepartmentId { get; set; }
     }
 }

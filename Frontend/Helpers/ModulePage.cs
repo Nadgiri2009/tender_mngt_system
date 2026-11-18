@@ -13,6 +13,8 @@ namespace DepartmentModule.Helpers
         protected int CurrentUserId { get; private set; }
         protected int CurrentRoleId { get; private set; }
         protected string CurrentRole { get; private set; }
+        protected string CurrentRoleCode { get; private set; }
+        protected string CurrentAccountType { get; private set; }
         protected int? CurrentDepartmentId { get; private set; }
         private readonly HashSet<string> CurrentPermissions =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -52,7 +54,8 @@ namespace DepartmentModule.Helpers
                 }
             }
 
-            CurrentUserId = CurrentRoleId > 0 ? CurrentUserId : 0;
+            CurrentUserId = CurrentUserId > 0 &&
+                (CurrentRoleId > 0 || CurrentAccountType == "ExternalBidder") ? CurrentUserId : 0;
             ViewStateUserKey = Session == null ? null : Session.SessionID;
             base.OnInit(e);
         }
@@ -61,23 +64,33 @@ namespace DepartmentModule.Helpers
         {
             using (SqlConnection connection = ModuleDb.OpenConnection())
             using (SqlCommand command = new SqlCommand(
-                @"SELECT u.UserId,u.RoleId,r.RoleName,u.DepartmentId,u.FullName
+                @"SELECT u.UserId,u.RoleId,r.RoleCode,r.RoleName,u.AccountType,u.DepartmentId,u.FullName
                   FROM dbo.Users u
-                  INNER JOIN dbo.Roles r ON r.RoleId=u.RoleId
-                  WHERE u.UserId=@UserId AND u.IsActive=1 AND r.IsActive=1;", connection))
+                  LEFT JOIN dbo.Roles r ON r.RoleId=u.RoleId
+                  WHERE u.UserId=@UserId AND u.IsActive=1
+                    AND ((u.AccountType=N'Internal' AND r.IsActive=1)
+                         OR (u.AccountType=N'ExternalBidder' AND u.RoleId IS NULL));", connection))
             {
                 ModuleDb.AddParameter(command, "@UserId", SqlDbType.Int, userId);
                 using (SqlDataReader reader = command.ExecuteReader())
                 {
                     if (!reader.Read()) return;
                     CurrentUserId = Convert.ToInt32(reader["UserId"]);
-                    CurrentRoleId = Convert.ToInt32(reader["RoleId"]);
-                    CurrentRole = Convert.ToString(reader["RoleName"]);
+                    CurrentRoleId = reader["RoleId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["RoleId"]);
+                    CurrentRoleCode = reader["RoleCode"] == DBNull.Value ? String.Empty : Convert.ToString(reader["RoleCode"]);
+                    CurrentAccountType = Convert.ToString(reader["AccountType"]);
+                    CurrentRole = reader["RoleName"] == DBNull.Value ? "ExternalBidder" : Convert.ToString(reader["RoleName"]);
                     CurrentDepartmentId = reader["DepartmentId"] == DBNull.Value
                         ? (int?)null
                         : Convert.ToInt32(reader["DepartmentId"]);
                     Session["FullName"] = Convert.ToString(reader["FullName"]);
                 }
+            }
+
+            if (CurrentRoleId <= 0)
+            {
+                LoadExternalPermissions();
+                return;
             }
 
             using (SqlConnection connection = ModuleDb.OpenConnection())
@@ -95,22 +108,51 @@ namespace DepartmentModule.Helpers
             }
         }
 
+        private void LoadExternalPermissions()
+        {
+            using (SqlConnection connection = ModuleDb.OpenConnection())
+            using (SqlCommand command = new SqlCommand(
+                @"SELECT p.PermissionKey
+                  FROM dbo.ExternalAccountTypePermissions x
+                  INNER JOIN dbo.Permissions p ON p.PermissionId=x.PermissionId AND p.IsActive=1
+                  WHERE x.AccountType=@AccountType;", connection))
+            {
+                ModuleDb.AddParameter(command, "@AccountType", SqlDbType.NVarChar, CurrentAccountType, 40);
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    while (reader.Read()) CurrentPermissions.Add(Convert.ToString(reader["PermissionKey"]));
+                }
+            }
+        }
+
         protected bool HasAnyRole(params string[] roles)
         {
             foreach (string role in roles)
             {
-                if (String.Equals(CurrentRole, role, StringComparison.OrdinalIgnoreCase) &&
-                    HasPermission("legacy.role." + role.ToLowerInvariant()))
-                {
-                    return true;
-                }
+                string requestedRole = role.Trim();
+                if (String.Equals(requestedRole, "Junior Engineer (JE)", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(requestedRole, "DepartmentOfficer", StringComparison.OrdinalIgnoreCase))
+                    if (CurrentRoleCode == "Junior Engineer (JE)") return true;
 
-                if (String.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) &&
-                    String.Equals(CurrentRole, "Super Admin", StringComparison.OrdinalIgnoreCase) &&
-                    HasPermission("system.admin")) return true;
-                if (String.Equals(role, "Contractor", StringComparison.OrdinalIgnoreCase) &&
-                    String.Equals(CurrentRole, "Contractor / Vendor", StringComparison.OrdinalIgnoreCase) &&
-                    HasPermission("bid.submit.own")) return true;
+                if (String.Equals(requestedRole, "Tender Cell", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(requestedRole, "TenderSection", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(requestedRole, "Nivida Kaksh (Tender Cell)", StringComparison.OrdinalIgnoreCase))
+                    if (CurrentRoleCode == "TENDER_CELL") return true;
+
+                if (String.Equals(requestedRole, "Tender Committee Chairman (Nivida Samiti Adhyaksha)", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(requestedRole, "TenderCommittee", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(requestedRole, "Nivida Samiti Adhyaksha", StringComparison.OrdinalIgnoreCase))
+                    if (CurrentRoleCode == "CHAIRMAN") return true;
+
+                if (String.Equals(requestedRole, "Director Auditor", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(requestedRole, "Chief Auditor", StringComparison.OrdinalIgnoreCase))
+                    if (CurrentRoleCode == "DIRECTOR_AUDITOR") return true;
+
+                if ((String.Equals(requestedRole, "Contractor", StringComparison.OrdinalIgnoreCase) ||
+                     String.Equals(requestedRole, "Contractor / Vendor", StringComparison.OrdinalIgnoreCase) ||
+                     String.Equals(requestedRole, "ExternalBidder", StringComparison.OrdinalIgnoreCase)) &&
+                    CurrentAccountType == "ExternalBidder")
+                    return true;
             }
             return false;
         }

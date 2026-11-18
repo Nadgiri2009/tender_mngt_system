@@ -45,9 +45,25 @@ export const createTenderSchema = z.object({
   estimatedAmount: estimatedAmountSchema,
   tenderType: tenderTypeSchema,
   tenderCategory: tenderCategorySchema,
+  budgetInformation: z.string().max(4000, "Budget details must be under 4000 characters").optional().or(z.literal("")),
+  technicalSanctionNumber: z.string().max(200).optional().or(z.literal("")),
+  technicalSanctionAuthority: z.string().max(400).optional().or(z.literal("")),
+  technicalSanctionDate: submissionDateSchema,
+  preBidMeetingUtc: submissionDateSchema,
+  preBidLocation: z.string().max(600).optional().or(z.literal("")),
+  preBidDetails: z.string().max(4000).optional().or(z.literal("")),
+  technicalBidOpeningScheduledUtc: submissionDateSchema,
   submissionStartDate: submissionDateSchema,
   submissionDeadline: submissionDateSchema,
 }).superRefine((values, context) => {
+  if (values.submissionStartDate && !values.submissionDeadline) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["submissionDeadline"],
+      message: "A submission deadline is required when an application start date is set",
+    });
+  }
+
   if (
     values.submissionStartDate &&
     values.submissionDeadline &&
@@ -59,6 +75,25 @@ export const createTenderSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["submissionDeadline"],
       message: "Submission deadline must be after the application start date",
+    });
+  }
+
+  if (values.preBidMeetingUtc && values.submissionDeadline &&
+    new Date(values.preBidMeetingUtc) >= new Date(values.submissionDeadline)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["preBidMeetingUtc"],
+      message: "The pre-bid meeting must be before the submission deadline",
+    });
+  }
+
+  if (values.technicalBidOpeningScheduledUtc &&
+    (!values.submissionDeadline ||
+      new Date(values.technicalBidOpeningScheduledUtc) <= new Date(values.submissionDeadline))) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["technicalBidOpeningScheduledUtc"],
+      message: "Technical bid opening must be after the submission deadline",
     });
   }
 });

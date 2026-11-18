@@ -22,11 +22,11 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>POST /api/bids/technical - contractor submits a technical bid</summary>
         [HttpPost("technical")]
-        [Authorize(Roles = $"{RoleNames.Contractor},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.Contractor)]
         public async Task<IActionResult> SubmitTechnical([FromBody] SubmitTechnicalBidDto dto)
         {
             var result = await _bidService.SubmitTechnicalBidAsync(
-                dto, User.GetUserId(), User.IsInRole(RoleNames.Admin));
+                dto, User.GetUserId(), false);
             return Ok(result);
         }
 
@@ -71,7 +71,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>PUT /api/bids/technical/evaluate - Tender Section marks Qualified/Disqualified</summary>
         [HttpPut("technical/evaluate")]
-        [Authorize(Roles = $"{RoleNames.TenderSection},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.Disabled)]
         public async Task<IActionResult> EvaluateTechnical([FromBody] EvaluateTechnicalBidDto dto)
         {
             var result = await _bidService.EvaluateTechnicalBidAsync(dto, User.GetUserId());
@@ -80,7 +80,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>POST /api/bids/financial - contractor submits a financial bid</summary>
         [HttpPost("financial")]
-        [Authorize(Roles = $"{RoleNames.Contractor},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.Contractor)]
         public async Task<IActionResult> SubmitFinancial([FromBody] SubmitFinancialBidDto dto)
         {
             var result = await _bidService.SubmitFinancialBidAsync(dto);
@@ -89,7 +89,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>POST /api/bids/financial/select - Tender Committee recommends the winning contractor</summary>
         [HttpPost("financial/select")]
-        [Authorize(Roles = $"{RoleNames.TenderCommittee},{RoleNames.Admin}")]
+        [Authorize(Roles = RoleNames.Disabled)]
         public async Task<IActionResult> SelectContractor([FromBody] SelectContractorDto dto)
         {
             var result = await _bidService.SelectContractorAsync(dto, User.GetUserId());
@@ -98,6 +98,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/bids/{tenderId} - returns technical bids; financial ranking via /api/bids/{tenderId}/financial</summary>
         [HttpGet("{tenderId:int}")]
+        [Authorize(Roles = $"{RoleNames.JuniorEngineer},{RoleNames.TenderCell}")]
         public async Task<IActionResult> GetTechnicalBids(int tenderId)
         {
             var result = await _bidService.GetTechnicalBidsAsync(tenderId);
@@ -106,6 +107,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/bids/{tenderId}/financial - ranked financial bids (L1 first)</summary>
         [HttpGet("{tenderId:int}/financial")]
+        [Authorize(Roles = $"{RoleNames.JuniorEngineer},{RoleNames.TenderCommitteeChairman},{RoleNames.DirectorAuditor}")]
         public async Task<IActionResult> GetFinancialBids(int tenderId)
         {
             var result = await _bidService.GetFinancialBidsRankedAsync(tenderId);

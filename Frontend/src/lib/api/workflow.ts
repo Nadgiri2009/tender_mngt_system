@@ -1,79 +1,20 @@
 import { apiClient, toApiError } from "./client";
-import type { TenderListItem } from "@/types/tender";
+import type { PagedResult, TenderListItem } from "@/types/tender";
 
 // Mirrors Backend/.../DTOs/Workflow/WorkflowDtos.cs exactly.
 
-// Workflow transitions mapping - mirrors backend WorkflowEngine
-const WORKFLOW_TRANSITIONS: Record<
-  string,
-  {
-    canSubmit: boolean;
-    submitRoles?: string[];
-    canApprove: boolean;
-    approverRoles?: string[];
-    canReject: boolean;
-    rejectRoles?: string[];
-  }
-> = {
-  Draft: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  RequirementSubmitted: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  EstimatePrepared: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  TSApprovalPending: { canSubmit: false, canApprove: true, approverRoles: ["TechnicalSanctionOfficer"], canReject: true, rejectRoles: ["TechnicalSanctionOfficer"] },
-  TSApproved: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  GBApprovalPending: { canSubmit: false, canApprove: true, approverRoles: ["GBOfficer"], canReject: true, rejectRoles: ["GBOfficer"] },
-  GBApproved: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  AdministrativeApprovalPending: { canSubmit: false, canApprove: true, approverRoles: ["DPDCOfficer"], canReject: true, rejectRoles: ["DPDCOfficer"] },
-  AdministrativeApproved: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  BudgetApprovalPending: { canSubmit: false, canApprove: true, approverRoles: ["CAFOOfficer"], canReject: true, rejectRoles: ["CAFOOfficer"] },
-  BudgetApproved: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  TenderDraftCreated: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  TenderCommitteeApproval: { canSubmit: false, canApprove: true, approverRoles: ["TenderCommittee"], canReject: true, rejectRoles: ["TenderCommittee"] },
-  PublicationApprovalPending: { canSubmit: false, canApprove: true, approverRoles: ["CompetentAuthority"], canReject: true, rejectRoles: ["CompetentAuthority"] },
-  TenderPublished: { canSubmit: true, submitRoles: ["TenderCommittee", "DepartmentOfficer"], canApprove: false, canReject: false },
-  TechnicalBidOpening: { canSubmit: true, submitRoles: ["TenderCommittee"], canApprove: false, canReject: false },
-  TechnicalEvaluation: { canSubmit: false, canApprove: true, approverRoles: ["TenderSection"], canReject: true, rejectRoles: ["TenderSection"] },
-  TechnicalEvaluationApproved: { canSubmit: false, canApprove: true, approverRoles: ["TenderCommittee"], canReject: true, rejectRoles: ["TenderCommittee"] },
-  FinancialBidOpening: { canSubmit: false, canApprove: false, canReject: false },
-  CAFORateOpinion: { canSubmit: true, submitRoles: ["CAFOOfficer"], canApprove: false, canReject: false },
-  FinancialEvaluation: { canSubmit: false, canApprove: false, canReject: false },
-  MCAOpinion: { canSubmit: true, submitRoles: ["MCAOfficer"], canApprove: false, canReject: false },
-  TenderCommitteeRecommendation: { canSubmit: false, canApprove: true, approverRoles: ["TenderCommittee"], canReject: true, rejectRoles: ["TenderCommittee"] },
-  FinalApproval: { canSubmit: false, canApprove: true, approverRoles: ["CompetentAuthority"], canReject: true, rejectRoles: ["CompetentAuthority"] },
-  AgreementCompleted: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  WorkOrderGenerated: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  WorkStarted: { canSubmit: true, submitRoles: ["Contractor"], canApprove: false, canReject: false },
-  MeasurementBookUpdated: { canSubmit: true, submitRoles: ["Contractor"], canApprove: false, canReject: false },
-  BillSubmitted: { canSubmit: false, canApprove: true, approverRoles: ["DepartmentOfficer"], canReject: true, rejectRoles: ["DepartmentOfficer"] },
-  BillApproved: { canSubmit: true, submitRoles: ["DepartmentOfficer"], canApprove: false, canReject: false },
-  PaymentCompleted: { canSubmit: false, canApprove: false, canReject: false },
-  Rejected: { canSubmit: false, canApprove: false, canReject: false },
-};
-
-function normalizeStatusKey(status: string): string {
-  return status.replace(/\s+/g, "").trim();
+export interface WorkflowActionOption {
+  actionName: string;
+  stageName: string;
+  fromStatus: string;
+  toStatus: string;
 }
 
-/**
- * Check if a user can perform an action at the current tender status
- */
-export function getAvailableActions(
-  currentStatus: string,
-  userRole?: string
-): { canSubmit: boolean; canApprove: boolean; canReject: boolean } {
-  const transition =
-    WORKFLOW_TRANSITIONS[currentStatus] ||
-    WORKFLOW_TRANSITIONS[normalizeStatusKey(currentStatus)] ||
-    { canSubmit: false, canApprove: false, canReject: false };
-
-  if (!userRole) {
-    return { canSubmit: false, canApprove: false, canReject: false };
-  }
-
-  return {
-    canSubmit: transition.canSubmit && (transition.submitRoles?.includes(userRole) ?? false),
-    canApprove: transition.canApprove && (transition.approverRoles?.includes(userRole) ?? false),
-    canReject: transition.canReject && (transition.rejectRoles?.includes(userRole) ?? false),
-  };
+export interface WorkflowStep {
+  status: string;
+  stageName: string;
+  assigneeRole: string | null;
+  isCurrent: boolean;
 }
 
 export interface ApprovalHistoryEntry {
@@ -96,6 +37,7 @@ export interface PendingApproval {
   estimatedAmount: number;
   departmentName: string;
   createdDate: string;
+  availableActions: string[];
 }
 
 export interface RoleDashboardStats {
@@ -116,53 +58,42 @@ export interface RoleDashboardStats {
 }
 
 
-// POST /api/tenders/{id}/submit -- plain forward hand-off, no approve/reject decision
-export async function submitTender(tenderId: number, remarks?: string): Promise<ApprovalHistoryEntry> {
+// GET /api/tenders/{id}/actions
+export async function fetchAvailableWorkflowActions(tenderId: number): Promise<WorkflowActionOption[]> {
   try {
-    const { data } = await apiClient.post<ApprovalHistoryEntry>(`/tenders/${tenderId}/submit`, { remarks });
+    const { data } = await apiClient.get<WorkflowActionOption[]>(`/tenders/${tenderId}/actions`);
     return data;
   } catch (error) {
     throw toApiError(error);
   }
 }
 
-// POST /api/tenders/{id}/approve -- approvalStage is required by the backend so it can verify
-// the caller's role is the one actually configured to approve the tender's CURRENT stage;
-// we always pass the tender's currentStatus-derived stage name back to the server, but the
-// server is the source of truth for whether that's actually valid right now.
-export async function approveTender(
+// POST /api/tenders/{id}/actions/{actionName}
+export async function executeWorkflowAction(
   tenderId: number,
-  approvalStage: string,
+  actionName: string,
   remarks?: string
 ): Promise<ApprovalHistoryEntry> {
   try {
-    const { data } = await apiClient.post<ApprovalHistoryEntry>(`/tenders/${tenderId}/approve`, {
-      approvalStage,
-      remarks,
-    });
+    const { data } = await apiClient.post<ApprovalHistoryEntry>(
+      `/tenders/${tenderId}/actions/${encodeURIComponent(actionName)}`,
+      { remarks }
+    );
     return data;
   } catch (error) {
     throw toApiError(error);
   }
 }
 
-// POST /api/tenders/{id}/reject
-export async function rejectTender(
-  tenderId: number,
-  approvalStage: string,
-  remarks?: string
-): Promise<ApprovalHistoryEntry> {
+// GET /api/tenders/workflow-steps
+export async function fetchWorkflowSteps(): Promise<WorkflowStep[]> {
   try {
-    const { data } = await apiClient.post<ApprovalHistoryEntry>(`/tenders/${tenderId}/reject`, {
-      approvalStage,
-      remarks,
-    });
+    const { data } = await apiClient.get<WorkflowStep[]>("/tenders/workflow-steps");
     return data;
   } catch (error) {
     throw toApiError(error);
   }
 }
-
 // GET /api/tenders/{id}/history
 export async function fetchTenderHistory(tenderId: number): Promise<ApprovalHistoryEntry[]> {
   try {
@@ -174,9 +105,19 @@ export async function fetchTenderHistory(tenderId: number): Promise<ApprovalHist
 }
 
 // GET /api/approvals/pending -- tenders awaiting the current (authenticated) user's role
-export async function fetchPendingApprovals(): Promise<PendingApproval[]> {
+export async function fetchPendingApprovals(query: {
+  pageNumber: number;
+  pageSize: number;
+  search?: string;
+}): Promise<PagedResult<PendingApproval>> {
   try {
-    const { data } = await apiClient.get<PendingApproval[]>("/approvals/pending");
+    const { data } = await apiClient.get<PagedResult<PendingApproval>>("/approvals/pending", {
+      params: {
+        pageNumber: query.pageNumber,
+        pageSize: query.pageSize,
+        search: query.search || undefined,
+      },
+    });
     return data;
   } catch (error) {
     throw toApiError(error);

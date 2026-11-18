@@ -6,14 +6,18 @@ namespace TenderManagement.Application.Interfaces
 {
     public interface ITenderService
     {
-        Task<PagedResult<TenderListItemDto>> GetTendersAsync(PaginationQuery query, int? createdByUserId = null);
+        Task<PagedResult<TenderListItemDto>> GetTendersAsync(
+            PaginationQuery query,
+            int? createdByUserId = null,
+            IReadOnlyCollection<int>? allowedTenderIds = null);
+        Task<List<int>> GetAssignedTenderIdsAsync(int userId, int roleId);
         Task<TenderDetailDto> GetTenderByIdAsync(int id, int? createdByUserId = null, bool allowPublishedForOtherOwners = false);
         Task<TenderDetailDto> CreateTenderAsync(CreateTenderDto dto, int currentUserId);
         Task<TenderDetailDto> UpdateTenderAsync(int id, UpdateTenderDto dto, int currentUserId);
         Task DeleteTenderAsync(int id, int currentUserId);
-        Task<BOQItemDto> AddBOQItemAsync(CreateBOQItemDto dto);
-        Task<BOQItemDto> UpdateBOQItemAsync(int boqId, UpdateBOQItemDto dto);
-        Task DeleteBOQItemAsync(int boqId);
+        Task<BOQItemDto> AddBOQItemAsync(CreateBOQItemDto dto, int currentUserId);
+        Task<BOQItemDto> UpdateBOQItemAsync(int boqId, UpdateBOQItemDto dto, int currentUserId);
+        Task DeleteBOQItemAsync(int boqId, int currentUserId);
         Task<List<BOQItemDto>> GetBOQItemsAsync(int tenderId);
         Task<TenderDocumentDto> UploadDocumentAsync(int tenderId, string documentType, Stream fileStream, string fileName, int uploadedBy);
         Task DeleteDocumentAsync(int documentId, int deletedBy);

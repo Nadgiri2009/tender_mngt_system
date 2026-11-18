@@ -12,7 +12,7 @@ namespace TenderManagement.Application.DTOs.User
         [Required, EmailAddress]
         public string Email { get; set; } = string.Empty;
 
-        [Required, Phone]
+        [Required, RegularExpression(@"^\d{10}$", ErrorMessage = "Enter a 10-digit mobile number.")]
         public string Mobile { get; set; } = string.Empty;
 
         [Required, MinLength(6)]
@@ -22,5 +22,30 @@ namespace TenderManagement.Application.DTOs.User
         public int RoleId { get; set; }
 
         public int? DepartmentId { get; set; }
+    }
+
+    /// <summary>Payload for updating an internal staff account.</summary>
+    public sealed record UpdateStaffUserDto
+    {
+        [Required, StringLength(150)]
+        public required string FullName { get; init; }
+
+        [Required, EmailAddress, StringLength(150)]
+        public required string Email { get; init; }
+
+        [Required, RegularExpression(@"^\d{10}$", ErrorMessage = "Enter a 10-digit mobile number.")]
+        public required string Mobile { get; init; }
+
+        [Required, Range(1, int.MaxValue)]
+        public required int RoleId { get; init; }
+
+        public int? DepartmentId { get; init; }
+    }
+
+    /// <summary>Payload for resetting a user's password.</summary>
+    public sealed record ResetStaffUserPasswordDto
+    {
+        [Required, MinLength(6)]
+        public required string Password { get; init; }
     }
 }

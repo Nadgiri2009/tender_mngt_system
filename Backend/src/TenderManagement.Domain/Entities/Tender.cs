@@ -12,6 +12,15 @@ namespace TenderManagement.Domain.Entities
         public decimal EstimatedAmount { get; set; }
         public string TenderType { get; set; } = string.Empty;
         public string? TenderCategoryName { get; set; }
+        public string? BudgetInformation { get; set; }
+        public string? TechnicalSanctionNumber { get; set; }
+        public string? TechnicalSanctionAuthority { get; set; }
+        public DateTime? TechnicalSanctionDate { get; set; }
+        public DateTime? PreBidMeetingUtc { get; set; }
+        public string? PreBidLocation { get; set; }
+        public string? PreBidDetails { get; set; }
+        public DateTime? TechnicalBidOpeningScheduledUtc { get; set; }
+        public short WorkflowVersion { get; set; } = 1;
         public string CurrentStatus { get; set; } = Enums.TenderStatus.Draft;
         public DateTime? SubmissionStartDate { get; set; }
         public DateTime? SubmissionDeadline { get; set; }

@@ -3,6 +3,7 @@ export interface AuthUser {
   fullName: string;
   email: string;
   role: string;
+  accountType: string;
   departmentId: number | null;
 }
 
@@ -14,6 +15,7 @@ export interface AuthResponse {
   fullName: string;
   email: string;
   role: string;
+  accountType: string;
   departmentId: number | null;
 }
 
@@ -28,6 +30,7 @@ export interface RequestLoginOtpInput {
 
 export interface RequestLoginOtpResponse {
   message: string;
+  developmentOtp?: string | null;
 }
 
 // Mirrors Backend RegisterRequestDto exactly
@@ -37,31 +40,25 @@ export interface RegisterInput {
   address?: string;
   email: string;
   mobile: string;
-  password: string;
   termsAccepted: boolean;
-  roleId: number;
-  departmentId?: number;
+}
+
+export interface RegisterResponse {
+  userId: number;
+  message: string;
 }
 
 export interface Role {
   roleId: number;
+  roleCode: string;
   roleName: string;
   description?: string | null;
 }
 
-// Real backend roles (Domain.Enums.RoleNames) -- not the invented 6-role list
-// from the original spec. These are what the backend actually enforces via
-// [Authorize(Roles = ...)].
 export const ROLE_NAMES = {
-  Admin: "Admin",
-  DepartmentOfficer: "DepartmentOfficer",
-  TechnicalSanctionOfficer: "TechnicalSanctionOfficer",
-  TenderSection: "TenderSection",
-  GBOfficer: "GBOfficer",
-  DPDCOfficer: "DPDCOfficer",
-  CAFOOfficer: "CAFOOfficer",
-  MCAOfficer: "MCAOfficer",
-  TenderCommittee: "TenderCommittee",
-  CompetentAuthority: "CompetentAuthority",
-  Contractor: "Contractor",
+  JuniorEngineer: "Junior Engineer (JE)",
+  TenderCell: "Tender Cell",
+  TenderCommitteeChairman: "Tender Committee Chairman (Nivida Samiti Adhyaksha)",
+  DirectorAuditor: "Director Auditor",
+  ExternalBidder: "ExternalBidder",
 } as const;

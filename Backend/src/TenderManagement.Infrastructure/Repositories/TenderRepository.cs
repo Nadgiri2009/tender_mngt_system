@@ -10,7 +10,10 @@ namespace TenderManagement.Infrastructure.Repositories
     {
         public TenderRepository(ApplicationDbContext context) : base(context) { }
 
-        public async Task<(IEnumerable<Tender> Items, int TotalCount)> GetPagedAsync(PaginationQuery query, int? createdByUserId = null)
+        public async Task<(IEnumerable<Tender> Items, int TotalCount)> GetPagedAsync(
+            PaginationQuery query,
+            int? createdByUserId = null,
+            IReadOnlyCollection<int>? allowedTenderIds = null)
         {
             var q = _dbSet.Include(t => t.Department).Include(t => t.CreatedByUser)
                 .Include(t => t.ApprovalHistories).AsQueryable();
@@ -18,6 +21,11 @@ namespace TenderManagement.Infrastructure.Repositories
             if (createdByUserId.HasValue)
             {
                 q = q.Where(t => t.CreatedBy == createdByUserId.Value);
+            }
+
+            if (allowedTenderIds is not null)
+            {
+                q = q.Where(t => allowedTenderIds.Contains(t.TenderId));
             }
 
             if (!string.IsNullOrWhiteSpace(query.Search))
@@ -61,6 +69,50 @@ namespace TenderManagement.Infrastructure.Repositories
             var total = await q.CountAsync();
 
             var items = await q
+                .Skip((query.PageNumber - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            return (items, total);
+        }
+
+        public async Task<(IEnumerable<Tender> Items, int TotalCount)> GetAssignedPendingPageAsync(
+            PaginationQuery query,
+            IReadOnlyCollection<string> pendingStatuses,
+            int roleId,
+            int userId,
+            int? departmentId,
+            bool isJuniorEngineer)
+        {
+            var assignedTenders =
+                from tender in _dbSet.AsNoTracking()
+                join assignment in _context.TenderWorkflowAssignments.AsNoTracking()
+                    on tender.TenderId equals assignment.TenderId
+                where tender.WorkflowVersion == 2 &&
+                    pendingStatuses.Contains(tender.CurrentStatus) &&
+                    assignment.IsCurrent &&
+                    assignment.ShortfallId == null &&
+                    assignment.AssignedRoleId == roleId &&
+                    (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == userId) &&
+                    (isJuniorEngineer || !departmentId.HasValue || assignment.DepartmentId == departmentId.Value)
+                select tender;
+
+            var pagedQuery = assignedTenders
+                .Distinct()
+                .Include(tender => tender.Department)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(query.Search))
+            {
+                pagedQuery = pagedQuery.Where(tender =>
+                    tender.TenderNumber.Contains(query.Search) ||
+                    tender.Title.Contains(query.Search));
+            }
+
+            var total = await pagedQuery.CountAsync();
+            var items = await pagedQuery
+                .OrderByDescending(tender => tender.CreatedDate)
+                .ThenBy(tender => tender.TenderId)
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
                 .ToListAsync();

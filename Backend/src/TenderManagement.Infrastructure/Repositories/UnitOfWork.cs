@@ -18,6 +18,8 @@ namespace TenderManagement.Infrastructure.Repositories
             TenderCategories = new GenericRepository<TenderCategoryMaster>(context);
             Users = new GenericRepository<User>(context);
             Roles = new GenericRepository<Role>(context);
+            Permissions = new GenericRepository<Permission>(context);
+            RolePermissions = new GenericRepository<RolePermission>(context);
             Departments = new GenericRepository<Department>(context);
             Estimates = new GenericRepository<Estimate>(context);
             ApprovalHistories = new GenericRepository<ApprovalHistory>(context);
@@ -35,6 +37,8 @@ namespace TenderManagement.Infrastructure.Repositories
             Payments = new GenericRepository<Payment>(context);
             AuditLogs = new GenericRepository<AuditLog>(context);
             WorkflowStages = new GenericRepository<WorkflowStage>(context);
+            WorkflowTransitions = new GenericRepository<WorkflowTransition>(context);
+            TenderWorkflowAssignments = new GenericRepository<TenderWorkflowAssignment>(context);
             Announcements = new GenericRepository<Announcement>(context);
         }
 
@@ -43,6 +47,8 @@ namespace TenderManagement.Infrastructure.Repositories
         public IGenericRepository<TenderCategoryMaster> TenderCategories { get; }
         public IGenericRepository<User> Users { get; }
         public IGenericRepository<Role> Roles { get; }
+        public IGenericRepository<Permission> Permissions { get; }
+        public IGenericRepository<RolePermission> RolePermissions { get; }
         public IGenericRepository<Department> Departments { get; }
         public IGenericRepository<Estimate> Estimates { get; }
         public IGenericRepository<ApprovalHistory> ApprovalHistories { get; }
@@ -60,6 +66,8 @@ namespace TenderManagement.Infrastructure.Repositories
         public IGenericRepository<Payment> Payments { get; }
         public IGenericRepository<AuditLog> AuditLogs { get; }
         public IGenericRepository<WorkflowStage> WorkflowStages { get; }
+        public IGenericRepository<WorkflowTransition> WorkflowTransitions { get; }
+        public IGenericRepository<TenderWorkflowAssignment> TenderWorkflowAssignments { get; }
         public IGenericRepository<Announcement> Announcements { get; }
 
         public async Task<int> CompleteAsync(CancellationToken cancellationToken = default) =>
@@ -71,20 +79,19 @@ namespace TenderManagement.Infrastructure.Repositories
         /// database transaction. Using a raw SQL call here (rather than two separate EF SaveChanges)
         /// guarantees atomicity for the most safety-critical operation in the system.
         /// </summary>
-        public async Task ExecuteWorkflowTransitionAsync(int tenderId, string approvalStage, string newStatus,
-            string actionStatus, int approvedBy, string? roleAtAction, string? remarks)
+        public async Task ExecuteWorkflowTransitionAsync(int tenderId, string transitionCode, string expectedStatus,
+            int approvedBy, int roleId, string? remarks)
         {
             var tenderIdParam = new SqlParameter("@TenderId", tenderId);
-            var stageParam = new SqlParameter("@ApprovalStage", approvalStage);
-            var newStatusParam = new SqlParameter("@NewStatus", newStatus);
-            var actionStatusParam = new SqlParameter("@ActionStatus", actionStatus);
+            var transitionParam = new SqlParameter("@TransitionCode", transitionCode);
+            var expectedStatusParam = new SqlParameter("@ExpectedStatus", expectedStatus);
             var approvedByParam = new SqlParameter("@ApprovedBy", approvedBy);
-            var roleParam = new SqlParameter("@RoleAtAction", roleAtAction ?? (object)DBNull.Value);
+            var roleIdParam = new SqlParameter("@RoleId", roleId);
             var remarksParam = new SqlParameter("@Remarks", remarks ?? (object)DBNull.Value);
 
             await _context.Database.ExecuteSqlRawAsync(
-                "EXEC sp_UpdateTenderStatus @TenderId, @ApprovalStage, @NewStatus, @ActionStatus, @ApprovedBy, @RoleAtAction, @Remarks",
-                tenderIdParam, stageParam, newStatusParam, actionStatusParam, approvedByParam, roleParam, remarksParam);
+                "EXEC dbo.sp_UpdateTenderStatus @TenderId, @TransitionCode, @ExpectedStatus, @ApprovedBy, @RoleId, @Remarks",
+                tenderIdParam, transitionParam, expectedStatusParam, approvedByParam, roleIdParam, remarksParam);
 
             // Keep the EF change-tracker in sync in case the same Tender instance is reused later
             // in this request (e.g. when returning the updated entity to the controller).
