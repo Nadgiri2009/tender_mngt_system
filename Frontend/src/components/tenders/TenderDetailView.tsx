@@ -27,7 +27,8 @@ interface TenderDetailViewProps {
 
 export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const isMainAdmin =
+    user?.accountType === "Internal" && user.role === ROLE_NAMES.JuniorEngineer;
 
   const { data: tender, isLoading, isError, error } = useQuery({
     queryKey: ["tender", tenderId],
@@ -63,7 +64,7 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
   if (!tender) return null;
 
   const isDraft = tender.currentStatus === "Draft";
-  const canEditDelete = isDraft && isAdmin;
+  const canEditDelete = isDraft && isMainAdmin;
   const applyHref = `/tenders/${tender.tenderId}/apply`;
 
   return (
