@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using TenderManagement.Domain.Enums;
 using TenderManagement.Infrastructure.Data;
 
 namespace TenderManagement.API.Authorization
@@ -20,6 +21,28 @@ namespace TenderManagement.API.Authorization
 
             var cancellationToken = (authorizationContext.Resource as HttpContext)?.RequestAborted
                 ?? CancellationToken.None;
+
+            var isMainAdminPermission = requirement.PermissionKey is
+                "users.manage" or "masterdata.manage" or "roles.manage";
+            if (isMainAdminPermission)
+            {
+                var isActiveJuniorEngineer = await (
+                    from user in context.Users.AsNoTracking()
+                    join role in context.Roles.AsNoTracking() on user.RoleId equals role.RoleId
+                    where user.UserId == userId
+                        && user.IsActive
+                        && user.AccountType == "Internal"
+                        && role.IsActive
+                        && role.RoleName == RoleNames.JuniorEngineer
+                    select role.RoleId
+                ).AnyAsync(cancellationToken);
+
+                if (isActiveJuniorEngineer)
+                {
+                    authorizationContext.Succeed(requirement);
+                    return;
+                }
+            }
 
             var hasPermission = await (
                 from user in context.Users.AsNoTracking()

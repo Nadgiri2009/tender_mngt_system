@@ -60,6 +60,7 @@ namespace TenderManagement.API.Controllers
             query.PageNumber = Math.Max(1, query.PageNumber);
             query.PageSize = Math.Clamp(query.PageSize, 1, 20);
             query.Status = TenderStatus.TenderPublished;
+            query.StatusGroup = null;
             query.SortBy = "createdDate";
             query.SortDescending = true;
 
@@ -121,12 +122,16 @@ namespace TenderManagement.API.Controllers
                 totalTenders = allTenders.Count(),
                 draftTenders = allTenders.Count(t => t.CurrentStatus == TenderStatus.Draft),
                 publishedTenders = allTenders.Count(t => t.CurrentStatus == TenderStatus.TenderPublished),
+                closedExpiredTenders = allTenders.Count(t =>
+                    t.CurrentStatus == TenderStatus.TenderPublished &&
+                    t.SubmissionDeadline.HasValue &&
+                    t.SubmissionDeadline.Value < DateTime.UtcNow),
                 approvedTenders = allTenders.Count(t => TenderStatusBuckets.IsApproved(t.CurrentStatus)),
                 pendingTenders = allTenders.Count(t => TenderStatusBuckets.IsPending(t.CurrentStatus)),
                 rejectedTenders = allTenders.Count(t => TenderStatusBuckets.IsRejected(t.CurrentStatus)),
                 underReviewTenders = allTenders.Count(t => TenderStatusBuckets.IsUnderReview(t.CurrentStatus)),
                 categoryBreakdown = allTenders
-                    .GroupBy(t => t.TenderType)
+                    .GroupBy(t => t.TenderCategoryName ?? "Uncategorized")
                     .Select(g => new { category = g.Key, tenderCount = g.Count() })
                     .OrderByDescending(g => g.tenderCount)
                     .ThenBy(g => g.category),

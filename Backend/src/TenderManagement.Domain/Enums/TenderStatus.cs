@@ -60,25 +60,65 @@ namespace TenderManagement.Domain.Enums
 
     public static class TenderStatusBuckets
     {
+        public const string ApprovedGroup = "approved";
+        public const string PendingGroup = "pending";
+        public const string RejectedGroup = "rejected";
+        public const string UnderReviewGroup = "under-review";
+        public const string ClosedExpiredGroup = "closed-expired";
+
+        public static readonly string[] ApprovedAdditionalStatuses =
+        [
+            TenderStatus.TenderPublished,
+            TenderStatus.FinalApproval,
+            TenderStatus.AgreementCompleted,
+            TenderStatus.WorkOrderGenerated,
+            TenderStatus.TenderAgreementGenerated,
+            TenderStatus.FinalFinancialApprovalCompleted,
+            TenderStatus.WorkStarted,
+            TenderStatus.MeasurementBookUpdated,
+            TenderStatus.PaymentCompleted
+        ];
+
+        public static readonly string[] PendingAdditionalStatuses =
+        [
+            TenderStatus.RequirementSubmitted,
+            TenderStatus.EstimatePrepared,
+            TenderStatus.TenderDraftCreated,
+            TenderStatus.BillSubmitted
+        ];
+
+        public static readonly string[] UnderReviewStatuses =
+        [
+            TenderStatus.TenderCommitteeApproval,
+            TenderStatus.TechnicalBidOpening,
+            TenderStatus.TechnicalEvaluation,
+            TenderStatus.FinancialBidOpening,
+            TenderStatus.FinancialEvaluation,
+            TenderStatus.CAFORateOpinion,
+            TenderStatus.MCAOpinion,
+            TenderStatus.TenderCommitteeRecommendation
+        ];
+
+        public static bool IsSupportedGroup(string group) =>
+            group.Equals(ApprovedGroup, StringComparison.OrdinalIgnoreCase) ||
+            group.Equals(PendingGroup, StringComparison.OrdinalIgnoreCase) ||
+            group.Equals(RejectedGroup, StringComparison.OrdinalIgnoreCase) ||
+            group.Equals(UnderReviewGroup, StringComparison.OrdinalIgnoreCase) ||
+            group.Equals(ClosedExpiredGroup, StringComparison.OrdinalIgnoreCase);
+
         public static bool IsApproved(string status) =>
             status.Contains("Approved", StringComparison.OrdinalIgnoreCase) ||
-            status is TenderStatus.TenderPublished or TenderStatus.FinalApproval or TenderStatus.AgreementCompleted
-                or TenderStatus.WorkOrderGenerated or TenderStatus.TenderAgreementGenerated
-                or TenderStatus.FinalFinancialApprovalCompleted or TenderStatus.WorkStarted or TenderStatus.MeasurementBookUpdated
-                or TenderStatus.PaymentCompleted;
+            ApprovedAdditionalStatuses.Contains(status, StringComparer.OrdinalIgnoreCase);
 
         public static bool IsPending(string status) =>
             status.Contains("Pending", StringComparison.OrdinalIgnoreCase) ||
-            status is TenderStatus.RequirementSubmitted or TenderStatus.EstimatePrepared or TenderStatus.TenderDraftCreated
-                or TenderStatus.BillSubmitted;
+            PendingAdditionalStatuses.Contains(status, StringComparer.OrdinalIgnoreCase);
 
         public static bool IsRejected(string status) =>
             status.Equals(TenderStatus.Rejected, StringComparison.OrdinalIgnoreCase);
 
         public static bool IsUnderReview(string status) =>
-            status is TenderStatus.TenderCommitteeApproval or TenderStatus.TechnicalBidOpening
-                or TenderStatus.TechnicalEvaluation or TenderStatus.FinancialBidOpening or TenderStatus.FinancialEvaluation
-                or TenderStatus.CAFORateOpinion or TenderStatus.MCAOpinion or TenderStatus.TenderCommitteeRecommendation;
+            UnderReviewStatuses.Contains(status, StringComparer.OrdinalIgnoreCase);
     }
 
     public static class RoleNames

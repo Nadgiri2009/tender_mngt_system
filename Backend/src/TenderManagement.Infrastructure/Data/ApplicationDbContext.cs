@@ -115,6 +115,8 @@ namespace TenderManagement.Infrastructure.Data
                 e.HasOne(x => x.Department).WithMany(d => d.Tenders).HasForeignKey(x => x.DepartmentId);
                 e.HasOne(x => x.TenderCategory).WithMany().HasForeignKey(x => x.TenderCategoryName)
                     .HasPrincipalKey(x => x.TypeName).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<TenderMethod>().WithMany().HasForeignKey(x => x.TenderType)
+                    .HasPrincipalKey(x => x.MethodName).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
                 e.HasQueryFilter(x => !x.IsDeleted);
                    e.Property(x => x.TrackingId).HasMaxLength(100).IsRequired();
@@ -125,7 +127,7 @@ namespace TenderManagement.Infrastructure.Data
             {
                 e.ToTable("TenderMethods");
                 e.HasKey(x => x.MethodName);
-                e.Property(x => x.MethodName).HasMaxLength(50);
+                e.Property(x => x.MethodName).HasMaxLength(50).IsRequired();
             });
 
             modelBuilder.Entity<TenderCategoryMaster>(e =>

@@ -6,6 +6,7 @@ namespace TenderManagement.Application.DTOs.Common
         public int PageSize { get; set; } = 10;
         public string? Search { get; set; }
         public string? Status { get; set; }
+        public string? StatusGroup { get; set; }
         public int? DepartmentId { get; set; }
         public string? TenderType { get; set; }
         public DateTime? SubmissionDateFrom { get; set; }

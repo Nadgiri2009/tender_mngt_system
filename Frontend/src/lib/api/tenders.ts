@@ -21,6 +21,7 @@ export async function fetchTenders(
         pageSize: query.pageSize ?? 10,
         search: query.search || undefined,
         status: query.status || undefined,
+        statusGroup: query.statusGroup || undefined,
         departmentId: query.departmentId || undefined,
         tenderType: query.tenderType || undefined,
         submissionDateFrom: query.submissionDateFrom || undefined,

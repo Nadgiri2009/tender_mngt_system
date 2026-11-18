@@ -72,6 +72,10 @@ namespace TenderManagement.API.Controllers
                 return NotFound(new { message = "Unknown master-data catalog." });
 
             var name = request.Name.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest(new { message = "Name is required." });
+            if (name.Length > GetCatalogNameLimit(normalizedCatalog))
+                return BadRequest(new { message = $"Name must be {GetCatalogNameLimit(normalizedCatalog)} characters or fewer." });
             if (await CatalogContainsNameAsync(normalizedCatalog, name, cancellationToken))
                 return Conflict(new { message = "An item with this name already exists." });
 
@@ -100,6 +104,10 @@ namespace TenderManagement.API.Controllers
                 return NotFound(new { message = "Unknown master-data catalog." });
 
             var name = request.Name.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest(new { message = "Name is required." });
+            if (name.Length > GetCatalogNameLimit(normalizedCatalog))
+                return BadRequest(new { message = $"Name must be {GetCatalogNameLimit(normalizedCatalog)} characters or fewer." });
             var current = await FindCatalogItemAsync(normalizedCatalog, key, cancellationToken);
             if (current is null)
                 return NotFound();
@@ -251,8 +259,10 @@ namespace TenderManagement.API.Controllers
             CancellationToken cancellationToken) =>
             catalog switch
             {
-                "tender-methods" => await _context.Tenders.AnyAsync(tender => tender.TenderType == key, cancellationToken),
-                "tender-types" => await _context.Tenders.AnyAsync(tender => tender.TenderCategoryName == key, cancellationToken),
+                "tender-methods" => await _context.Tenders.IgnoreQueryFilters()
+                    .AnyAsync(tender => tender.TenderType == key, cancellationToken),
+                "tender-types" => await _context.Tenders.IgnoreQueryFilters()
+                    .AnyAsync(tender => tender.TenderCategoryName == key, cancellationToken),
                 "document-types" =>
                     await _context.TechnicalBidDocuments.AnyAsync(document => document.DocumentType == key, cancellationToken) ||
                     await _context.Database.SqlQuery<long>($"""
@@ -314,6 +324,15 @@ namespace TenderManagement.API.Controllers
                 "document-types" => "document-types",
                 "units" => "units",
                 _ => null
+            };
+
+        private static int GetCatalogNameLimit(string catalog) =>
+            catalog switch
+            {
+                "tender-methods" or "tender-types" => 50,
+                "document-types" => 80,
+                "units" => 20,
+                _ => throw new ArgumentOutOfRangeException(nameof(catalog), catalog, "Unknown master-data catalog.")
             };
     }
 }

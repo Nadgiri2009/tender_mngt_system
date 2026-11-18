@@ -98,6 +98,7 @@ export interface PaginationQuery {
   pageSize?: number;
   search?: string;
   status?: string;
+  statusGroup?: string;
   departmentId?: number;
   tenderType?: string;
   submissionDateFrom?: string;

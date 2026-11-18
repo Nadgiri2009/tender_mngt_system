@@ -4,12 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, LogOut, LayoutDashboard, ClipboardCheck } from "lucide-react";
+import { Menu, X, LayoutDashboard, ClipboardCheck } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ROLE_NAMES } from "@/types/auth";
+import { UserProfileMenu } from "@/components/layout/UserProfileMenu";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -22,13 +23,8 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const pathname = usePathname();
-
-  const handleLogout = () => {
-    setMobileOpen(false);
-    logout();
-  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur">
@@ -90,12 +86,7 @@ export function Navbar() {
                   </Link>
                 </Button>
               )}
-              <span className="text-sm text-muted-foreground">
-                {user?.fullName} <span className="text-xs">({user?.role})</span>
-              </span>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="mr-1 h-4 w-4" /> Logout
-              </Button>
+              <UserProfileMenu />
             </>
           ) : (
             <>
@@ -153,9 +144,7 @@ export function Navbar() {
                       </Link>
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={handleLogout}>
-                    Logout ({user?.fullName})
-                  </Button>
+                  <UserProfileMenu className="self-start" onLogout={() => setMobileOpen(false)} />
                 </>
               ) : (
                 <>

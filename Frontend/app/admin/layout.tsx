@@ -6,11 +6,19 @@ import { usePathname } from "next/navigation";
 import {
   ArrowLeftCircle,
   Building2,
+  ClipboardList,
   FileText,
+  Files,
+  Gavel,
+  List,
   LayoutDashboard,
   Megaphone,
   Menu,
+  Ruler,
+  ShieldCheck,
+  Tags,
   X,
+  Users,
 } from "lucide-react";
 
 import { useRequireRole } from "@/hooks/useRequireRole";
@@ -18,30 +26,35 @@ import { ROLE_NAMES } from "@/types/auth";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { UserProfileMenu } from "@/components/layout/UserProfileMenu";
 
 const ADMIN_GROUPS = [
   {
     label: "Tender Management",
     icon: FileText,
     items: [
-      { href: "/tenders/new", label: "Create Tender" },
-      { href: "/tenders", label: "Tender List" },
+      { href: "/tenders/new", label: "Create Tender", icon: FileText },
+      { href: "/tenders", label: "Tender List", icon: List },
     ],
   },
   {
     label: "Master Data",
     icon: Building2,
     items: [
-      { href: "/admin/departments", label: "Departments" },
-      { href: "/admin/users", label: "Users" },
-      { href: "/admin/roles", label: "Roles & Permissions" },
+      { href: "/admin/departments", label: "Departments", icon: Building2 },
+      { href: "/admin/users", label: "Users", icon: Users },
+      { href: "/admin/roles", label: "Roles & Permissions", icon: ShieldCheck },
+      { href: "/admin/master-data/tender-methods", label: "Tender Methods", icon: Gavel },
+      { href: "/admin/master-data/tender-categories", label: "Tender Categories", icon: Tags },
+      { href: "/admin/master-data/document-types", label: "Document Types", icon: Files },
+      { href: "/admin/master-data/units", label: "Units of Measurement", icon: Ruler },
     ],
   },
   {
     label: "System Management",
     icon: Megaphone,
     items: [
-      { href: "/admin/announcements", label: "Announcements" },
+      { href: "/admin/announcements", label: "Announcements", icon: ClipboardList },
     ],
   },
 ];
@@ -83,11 +96,12 @@ function NavigationGroups({
                   href={item.href}
                   onClick={onNavigate}
                   className={cn(
-                    "block rounded-md px-3 py-2 text-sm transition-colors hover:bg-white/10 hover:text-white",
+                    "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-white/10 hover:text-white",
                     isActive ? "bg-white/10 font-medium text-white" : "text-white/65"
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
+                  <item.icon className="h-4 w-4 shrink-0" />
                   {item.label}
                 </Link>
               );
@@ -139,7 +153,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-border bg-[hsl(var(--navy-950))] px-3 py-2 text-white sm:hidden">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Button
               type="button"
               variant="ghost"
@@ -156,6 +170,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <p className="truncate text-sm font-semibold">Junior Engineer (JE) Main Admin</p>
               <p className="truncate text-xs text-white/60">Tender Management</p>
             </div>
+            <UserProfileMenu className="ml-auto" appearance="dark" />
           </div>
           {menuOpen && (
             <nav id="Junior Engineer (JE)-mobile-navigation" aria-label="Main navigation" className="max-h-[75vh] space-y-2 overflow-y-auto py-3">
@@ -169,6 +184,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </Link>
             </nav>
           )}
+        </header>
+
+        <header className="sticky top-0 z-30 hidden h-16 items-center justify-end border-b border-border bg-background/95 px-6 backdrop-blur sm:flex">
+          <UserProfileMenu />
         </header>
 
         <main className="min-w-0 flex-1 bg-background">

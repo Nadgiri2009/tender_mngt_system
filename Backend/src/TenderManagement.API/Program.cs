@@ -130,6 +130,9 @@ builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 // ---------------------------------------------------------------------------
 // JWT Authentication
 // ---------------------------------------------------------------------------
+builder.Configuration["Jwt:Issuer"] ??= "TenderManagementAPI";
+builder.Configuration["Jwt:Audience"] ??= "TenderManagementClient";
+
 var jwtSection = builder.Configuration.GetSection("Jwt");
 
 var jwtKey = jwtSection["Key"];

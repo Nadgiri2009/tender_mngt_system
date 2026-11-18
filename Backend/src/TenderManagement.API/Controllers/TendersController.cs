@@ -26,6 +26,12 @@ namespace TenderManagement.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetAll([FromQuery] PaginationQuery query)
         {
+            if (!string.IsNullOrWhiteSpace(query.StatusGroup) &&
+                !TenderStatusBuckets.IsSupportedGroup(query.StatusGroup.Trim()))
+            {
+                return BadRequest("Invalid tender status group.");
+            }
+
             var isAuthenticated = User.Identity?.IsAuthenticated == true;
             var isExternalBidder = User.IsInRole(RoleNames.ExternalBidder) ||
                 User.FindFirst("accountType")?.Value == "ExternalBidder";

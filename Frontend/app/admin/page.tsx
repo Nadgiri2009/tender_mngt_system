@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Building2, Users, BarChart3, Eye, CheckCircle2, Clock3, XCircle, SearchCheck, CalendarClock, Layers3 } from "lucide-react";
+import { FileText, Building2, Users, BarChart3, Eye, CheckCircle2, Clock3, XCircle, SearchCheck, CalendarClock, Layers3, Plus } from "lucide-react";
 
 import { fetchAdminStats } from "@/lib/api/dashboard";
 import { fetchTenders } from "@/lib/api/tenders";
@@ -38,41 +38,48 @@ export default function AdminDashboardPage() {
         description="Live system overview."
         actions={
           <Button asChild>
-            <Link href="/tenders/new">Create Tender</Link>
+            <Link href="/tenders/new"><Plus className="mr-1 h-4 w-4" />Create Tender</Link>
           </Button>
         }
       />
 
       {isError && <p className="text-sm text-destructive">Could not load dashboard stats.</p>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
-          { label: "Total Tenders", value: data?.totalTenders, icon: FileText },
-          { label: "Draft", value: data?.draftTenders, icon: FileText },
-          { label: "Approved", value: data?.approvedTenders, icon: CheckCircle2 },
-          { label: "Published", value: data?.publishedTenders, icon: CheckCircle2 },
-          { label: "Pending", value: data?.pendingTenders, icon: Clock3 },
-          { label: "Rejected", value: data?.rejectedTenders, icon: XCircle },
-          { label: "Under Review", value: data?.underReviewTenders, icon: SearchCheck },
-          { label: "Closed / Expired", value: data?.closedExpiredTenders, icon: CalendarClock },
-          { label: "Departments", value: data?.totalDepartments, icon: Building2 },
-          { label: "Staff & Vendor Users", value: data?.totalUsers, icon: Users },
+          { label: "Total Tenders", value: data?.totalTenders, icon: FileText, href: "/tenders" },
+          { label: "Draft", value: data?.draftTenders, icon: FileText, href: "/tenders?status=Draft" },
+          { label: "Approved", value: data?.approvedTenders, icon: CheckCircle2, href: "/tenders?statusGroup=approved" },
+          { label: "Published", value: data?.publishedTenders, icon: CheckCircle2, href: "/tenders?status=Tender%20Published" },
+          { label: "Pending", value: data?.pendingTenders, icon: Clock3, href: "/tenders?statusGroup=pending" },
+          { label: "Rejected", value: data?.rejectedTenders, icon: XCircle, href: "/tenders?status=Rejected" },
+          { label: "Under Review", value: data?.underReviewTenders, icon: SearchCheck, href: "/tenders?statusGroup=under-review" },
+          { label: "Closed / Expired", value: data?.closedExpiredTenders, icon: CalendarClock, href: "/tenders?statusGroup=closed-expired" },
+          { label: "Departments", value: data?.totalDepartments, icon: Building2, href: "/admin/departments" },
+          { label: "Staff & Vendor Users", value: data?.totalUsers, icon: Users, href: "/admin/users" },
         ].map((card) => (
-          <Card key={card.label}>
-            <CardContent className="flex items-center gap-4 pt-6">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <card.icon className="h-5 w-5" />
-              </div>
-              <div>
-                {isLoading ? (
-                  <Skeleton className="h-7 w-10" />
-                ) : (
-                  <p className="text-2xl font-bold text-foreground">{card.value ?? "—"}</p>
-                )}
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <Link
+            key={card.label}
+            href={card.href}
+            aria-label={`View ${card.label} details`}
+            className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Card className="h-full transition-colors hover:border-primary/40 hover:bg-muted/30">
+              <CardContent className="flex items-center gap-3 px-3 py-4 sm:px-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <card.icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  {isLoading ? (
+                    <Skeleton className="h-6 w-10" />
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-foreground">{card.value ?? "—"}</p>
+                  )}
+                  <p className="truncate text-xs text-muted-foreground">{card.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

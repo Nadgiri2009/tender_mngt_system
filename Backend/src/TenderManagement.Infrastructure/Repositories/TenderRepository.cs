@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TenderManagement.Application.DTOs.Common;
 using TenderManagement.Application.Interfaces;
 using TenderManagement.Domain.Entities;
+using TenderManagement.Domain.Enums;
 using TenderManagement.Infrastructure.Data;
 
 namespace TenderManagement.Infrastructure.Repositories
@@ -36,6 +37,28 @@ namespace TenderManagement.Infrastructure.Repositories
             if (!string.IsNullOrWhiteSpace(query.Status))
             {
                 q = q.Where(t => t.CurrentStatus == query.Status);
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.StatusGroup))
+            {
+                q = query.StatusGroup.Trim().ToLowerInvariant() switch
+                {
+                    TenderStatusBuckets.ApprovedGroup => q.Where(t =>
+                        t.CurrentStatus.Contains("Approved") ||
+                        TenderStatusBuckets.ApprovedAdditionalStatuses.Contains(t.CurrentStatus)),
+                    TenderStatusBuckets.PendingGroup => q.Where(t =>
+                        t.CurrentStatus.Contains("Pending") ||
+                        TenderStatusBuckets.PendingAdditionalStatuses.Contains(t.CurrentStatus)),
+                    TenderStatusBuckets.RejectedGroup => q.Where(t =>
+                        t.CurrentStatus == TenderStatus.Rejected),
+                    TenderStatusBuckets.UnderReviewGroup => q.Where(t =>
+                        TenderStatusBuckets.UnderReviewStatuses.Contains(t.CurrentStatus)),
+                    TenderStatusBuckets.ClosedExpiredGroup => q.Where(t =>
+                        t.CurrentStatus == TenderStatus.TenderPublished &&
+                        t.SubmissionDeadline.HasValue &&
+                        t.SubmissionDeadline.Value < DateTime.UtcNow),
+                    _ => q
+                };
             }
 
             if (query.DepartmentId.HasValue)

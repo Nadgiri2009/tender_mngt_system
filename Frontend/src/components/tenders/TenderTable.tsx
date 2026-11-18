@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -24,6 +24,7 @@ const ALL = "__all__";
 export function TenderTable() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(ALL);
+  const [statusGroup, setStatusGroup] = useState<string>();
   const [departmentId, setDepartmentId] = useState<string>(ALL);
   const [tenderType, setTenderType] = useState<string>(ALL);
   const [dateFrom, setDateFrom] = useState("");
@@ -32,6 +33,12 @@ export function TenderTable() {
   const pageSize = 10;
 
   const debouncedSearch = useDebouncedValue(search, 400);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setStatus(params.get("status") || ALL);
+    setStatusGroup(params.get("statusGroup") || undefined);
+  }, []);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -49,11 +56,12 @@ export function TenderTable() {
   });
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["tenders", { debouncedSearch, status, departmentId, tenderType, dateFrom, dateTo, pageNumber, pageSize }],
+    queryKey: ["tenders", { debouncedSearch, status, statusGroup, departmentId, tenderType, dateFrom, dateTo, pageNumber, pageSize }],
     queryFn: () =>
       fetchTenders({
         search: debouncedSearch,
         status: status === ALL ? undefined : status,
+        statusGroup,
         departmentId: departmentId === ALL ? undefined : Number(departmentId),
         tenderType: tenderType === ALL ? undefined : tenderType,
         submissionDateFrom: dateFrom || undefined,
@@ -86,6 +94,13 @@ export function TenderTable() {
             value={status}
             onValueChange={(v) => {
               setStatus(v);
+              setStatusGroup(undefined);
+              const params = new URLSearchParams(window.location.search);
+              params.delete("statusGroup");
+              if (v === ALL) params.delete("status");
+              else params.set("status", v);
+              const query = params.toString();
+              window.history.replaceState(null, "", query ? `${window.location.pathname}?${query}` : window.location.pathname);
               setPageNumber(1);
             }}
           >
@@ -139,6 +154,31 @@ export function TenderTable() {
           </Select>
         </div>
       </div>
+
+      {statusGroup && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <span>
+            Showing dashboard group: {statusGroup.replace(/-/g, " ")}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const params = new URLSearchParams(window.location.search);
+              params.delete("statusGroup");
+              params.delete("status");
+              const query = params.toString();
+              window.history.replaceState(null, "", query ? `${window.location.pathname}?${query}` : window.location.pathname);
+              setStatusGroup(undefined);
+              setStatus(ALL);
+              setPageNumber(1);
+            }}
+          >
+            Clear dashboard filter
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
         <label className="block min-w-0 space-y-1 text-sm text-muted-foreground">
