@@ -71,7 +71,9 @@ export default function LoginPage() {
         return;
       }
       toast.success(`Welcome back, ${auth.fullName}.`);
-      router.replace(getAuthReturnUrl() ?? (auth.role === "Junior Engineer (JE)" ? "/admin" : "/dashboard"));
+      window.location.replace(
+        getAuthReturnUrl() ?? (auth.role === "Junior Engineer (JE)" ? "/admin" : "/dashboard")
+      );
     },
     onError: (error: ApiError) => {
       setServerError(error.message || "Login failed.");

@@ -7,6 +7,7 @@ const LEGACY_TOKEN_KEY = "tms_access_token";
 const LEGACY_USER_KEY = "tms_user";
 
 export const AUTH_UNAUTHORIZED_EVENT = "tms:unauthorized";
+export const AUTH_SESSION_ERROR_KEY = "tms_auth_session_error";
 
 function clearStoredSession(): void {
   if (typeof window === "undefined") return;
@@ -14,6 +15,7 @@ function clearStoredSession(): void {
   window.sessionStorage.removeItem(TOKEN_KEY);
   window.sessionStorage.removeItem(USER_KEY);
   window.sessionStorage.removeItem(EXPIRY_KEY);
+  window.sessionStorage.removeItem(AUTH_SESSION_ERROR_KEY);
   window.localStorage.removeItem(LEGACY_TOKEN_KEY);
   window.localStorage.removeItem(LEGACY_USER_KEY);
 }
@@ -44,11 +46,17 @@ export function clearAuthSession(): void {
   clearStoredSession();
 }
 
-export function expireStoredSession(): void {
+export function expireStoredSession(rejectedPath?: string): void {
+  if (typeof window === "undefined" || window.sessionStorage.getItem(TOKEN_KEY) === null) return;
+
   clearStoredSession();
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
-  }
+  window.sessionStorage.setItem(
+    AUTH_SESSION_ERROR_KEY,
+    rejectedPath
+      ? `The server rejected your session while accessing ${rejectedPath}. Please sign in again.`
+      : "The server rejected your sign-in session. Please sign in again."
+  );
+  window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
 }
 
 export function getStoredUser(): string | null {

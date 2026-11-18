@@ -3,8 +3,10 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { AuthResponse, AuthUser } from "@/types/auth";
 import {
+  AUTH_SESSION_ERROR_KEY,
   AUTH_UNAUTHORIZED_EVENT,
   clearAuthSession,
   getStoredExpiry,
@@ -82,14 +84,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient, router]);
 
   useEffect(() => {
+    const showPendingSessionError = () => {
+      const message = window.sessionStorage.getItem(AUTH_SESSION_ERROR_KEY);
+      if (message) {
+        window.sessionStorage.removeItem(AUTH_SESSION_ERROR_KEY);
+        toast.error(message);
+      }
+    };
+
+    if (pathname.startsWith("/login")) {
+      showPendingSessionError();
+    }
+
     const handleUnauthorized = () => {
-      const hadSession = !!user || !!getStoredUser();
-      clearAuthSession();
       queryClient.clear();
       setUser(null);
 
-      if (hadSession && !pathname.startsWith("/login") && !pathname.startsWith("/register")) {
+      if (!pathname.startsWith("/login") && !pathname.startsWith("/register")) {
         router.replace("/login");
+      } else {
+        showPendingSessionError();
       }
     };
 

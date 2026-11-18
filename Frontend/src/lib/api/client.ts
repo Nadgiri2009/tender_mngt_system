@@ -19,8 +19,15 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      expireStoredSession();
+    const requestPath = axios.isAxiosError(error) ? error.config?.url?.split("?")[0] : undefined;
+    const isAuthRequest = requestPath?.startsWith("/auth/");
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      error.config?.headers?.Authorization &&
+      !isAuthRequest
+    ) {
+      expireStoredSession(requestPath);
     }
     return Promise.reject(error);
   }
@@ -55,6 +62,13 @@ export function toApiError(error: unknown): ApiError {
       return new ApiError(
         `Auth endpoint not found at ${requestUrl}. Check NEXT_PUBLIC_API_BASE_URL (expected API host/port, e.g. http://localhost:5000/api).`,
         404
+      );
+    }
+
+    if (axiosError.code === "ECONNABORTED" || axiosError.code === "ETIMEDOUT") {
+      return new ApiError(
+        "Sign-in timed out because the server did not respond. Check that the API is running, then try again.",
+        408
       );
     }
 

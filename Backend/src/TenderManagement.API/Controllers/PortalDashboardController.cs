@@ -99,9 +99,9 @@ namespace TenderManagement.API.Controllers
                 .Select(d => new { d.DepartmentId, d.DepartmentName }));
         }
 
-        /// <summary>GET /api/dashboard/admin-stats - Admin only, breakdown by status</summary>
+        /// <summary>GET /api/dashboard/admin-stats - JE Main Admin only, breakdown by status</summary>
         [HttpGet("admin-stats")]
-        [Authorize(Roles = RoleNames.Admin)]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> GetAdminStats()
         {
             var allTenders = await _unitOfWork.Tenders.GetAllAsync();

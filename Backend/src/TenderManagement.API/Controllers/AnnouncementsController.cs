@@ -23,37 +23,37 @@ namespace TenderManagement.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetPublished() => Ok(await _announcementService.GetPublishedAsync());
 
-        /// <summary>GET /api/announcements - Admin only, includes drafts</summary>
+        /// <summary>GET /api/announcements - JE Main Admin only, includes drafts</summary>
         [HttpGet]
-        [Authorize(Roles = RoleNames.Admin)]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> GetAll() => Ok(await _announcementService.GetAllAsync());
 
-        /// <summary>GET /api/announcements/{id} - Admin only</summary>
+        /// <summary>GET /api/announcements/{id} - JE Main Admin only</summary>
         [HttpGet("{id:int}")]
-        [Authorize(Roles = RoleNames.Admin)]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> GetById(int id) => Ok(await _announcementService.GetByIdAsync(id));
 
-        /// <summary>POST /api/announcements - Admin only</summary>
+        /// <summary>POST /api/announcements - JE Main Admin only</summary>
         [HttpPost]
-        [Authorize(Roles = RoleNames.Admin)]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Create([FromBody] CreateAnnouncementDto dto)
         {
             var result = await _announcementService.CreateAsync(dto, User.GetUserId());
             return Ok(result);
         }
 
-        /// <summary>PUT /api/announcements/{id} - Admin only</summary>
+        /// <summary>PUT /api/announcements/{id} - JE Main Admin only</summary>
         [HttpPut("{id:int}")]
-        [Authorize(Roles = RoleNames.Admin)]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateAnnouncementDto dto)
         {
             var result = await _announcementService.UpdateAsync(id, dto, User.GetUserId());
             return Ok(result);
         }
 
-        /// <summary>DELETE /api/announcements/{id} - Admin only, soft delete</summary>
+        /// <summary>DELETE /api/announcements/{id} - JE Main Admin only, soft delete</summary>
         [HttpDelete("{id:int}")]
-        [Authorize(Roles = RoleNames.Admin)]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> Delete(int id)
         {
             await _announcementService.DeleteAsync(id);
