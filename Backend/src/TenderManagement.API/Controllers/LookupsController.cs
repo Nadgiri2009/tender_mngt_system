@@ -33,9 +33,9 @@ namespace TenderManagement.API.Controllers
             return Ok(await activeTransitions.OrderBy(status => status).ToListAsync(cancellationToken));
         }
 
-        /// <summary>GET /api/lookups/tender-types returns active procurement methods.</summary>
-        [HttpGet("tender-types")]
-        public async Task<IActionResult> GetTenderTypes(CancellationToken cancellationToken)
+        /// <summary>GET /api/lookups/tender-methods returns active procurement methods.</summary>
+        [HttpGet("tender-methods")]
+        public async Task<IActionResult> GetTenderMethods(CancellationToken cancellationToken)
         {
             var methods = await _context.TenderMethods.AsNoTracking()
                 .Where(method => method.IsActive)
@@ -46,18 +46,23 @@ namespace TenderManagement.API.Controllers
             return Ok(methods);
         }
 
-        /// <summary>GET /api/lookups/tender-categories returns active tender categories.</summary>
-        [HttpGet("tender-categories")]
-        public async Task<IActionResult> GetTenderCategories(CancellationToken cancellationToken)
+        /// <summary>GET /api/lookups/tender-types returns active tender types.</summary>
+        [HttpGet("tender-types")]
+        public async Task<IActionResult> GetTenderTypes(CancellationToken cancellationToken)
         {
-            var categories = await _context.TenderCategories.AsNoTracking()
-                .Where(category => category.IsActive)
-                .OrderBy(category => category.SortOrder)
-                .ThenBy(category => category.TypeName)
-                .Select(category => category.TypeName)
+            var types = await _context.TenderCategories.AsNoTracking()
+                .Where(type => type.IsActive)
+                .OrderBy(type => type.SortOrder)
+                .ThenBy(type => type.TypeName)
+                .Select(type => type.TypeName)
                 .ToListAsync(cancellationToken);
-            return Ok(categories);
+            return Ok(types);
         }
+
+        /// <summary>Legacy alias for GET /api/lookups/tender-types.</summary>
+        [HttpGet("tender-categories")]
+        public Task<IActionResult> GetTenderCategories(CancellationToken cancellationToken) =>
+            GetTenderTypes(cancellationToken);
 
         /// <summary>GET /api/lookups/role-names</summary>
         [HttpGet("role-names")]

@@ -39,16 +39,30 @@ const CATALOGS: Record<string, {
   "tender-methods": {
     apiCatalog: "tender-methods",
     title: "Tender Methods",
-    description: "Manage the active tender methods available during tender creation.",
+    description: "Manage the active procurement methods available during tender creation.",
     nameLabel: "Method name",
+    maxNameLength: 50,
+  },
+  "tender-types": {
+    apiCatalog: "tender-types",
+    title: "Tender Types",
+    description: "Manage the active tender types available during tender creation.",
+    nameLabel: "Tender type",
     maxNameLength: 50,
   },
   "tender-categories": {
     apiCatalog: "tender-types",
-    title: "Tender Categories",
-    description: "Manage the active tender categories available during tender creation.",
-    nameLabel: "Category name",
+    title: "Tender Types",
+    description: "Manage the active tender types available during tender creation.",
+    nameLabel: "Tender type",
     maxNameLength: 50,
+  },
+  designations: {
+    apiCatalog: "designations",
+    title: "Designations",
+    description: "Manage designation records stored in the Designations master table.",
+    nameLabel: "Designation",
+    maxNameLength: 150,
   },
   "document-types": {
     apiCatalog: "document-types",
@@ -103,8 +117,8 @@ export default function MasterDataCatalogPage() {
       toast.success(editingItem ? "Master-data item updated." : "Master-data item added.");
       queryClient.invalidateQueries({ queryKey: ["master-data", catalog?.apiCatalog] });
       if (catalog?.apiCatalog === "tender-methods" || catalog?.apiCatalog === "tender-types") {
+        queryClient.invalidateQueries({ queryKey: ["tender-methods"] });
         queryClient.invalidateQueries({ queryKey: ["tender-types"] });
-        queryClient.invalidateQueries({ queryKey: ["tender-categories"] });
       }
       setDialogOpen(false);
       setEditingItem(null);
@@ -118,8 +132,8 @@ export default function MasterDataCatalogPage() {
       toast.success(result.message || "Master-data item deleted.");
       queryClient.invalidateQueries({ queryKey: ["master-data", catalog?.apiCatalog] });
       if (catalog?.apiCatalog === "tender-methods" || catalog?.apiCatalog === "tender-types") {
+        queryClient.invalidateQueries({ queryKey: ["tender-methods"] });
         queryClient.invalidateQueries({ queryKey: ["tender-types"] });
-        queryClient.invalidateQueries({ queryKey: ["tender-categories"] });
       }
     },
     onError: (deleteError: ApiError) => toast.error(deleteError.message || "Could not delete this item."),

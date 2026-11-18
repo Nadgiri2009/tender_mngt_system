@@ -7,7 +7,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { fetchTenders } from "@/lib/api/tenders";
 import { fetchDepartments } from "@/lib/api/departments";
-import { fetchTenderStatuses, fetchTenderTypes } from "@/lib/api/lookups";
+import { fetchTenderMethods, fetchTenderStatuses } from "@/lib/api/lookups";
 import { formatCurrencyINR, formatDate } from "@/lib/utils";
 
 import { Input } from "@/components/ui/input";
@@ -50,9 +50,9 @@ export function TenderTable() {
     queryFn: fetchTenderStatuses,
   });
 
-  const { data: tenderTypes } = useQuery({
-    queryKey: ["tender-types"],
-    queryFn: fetchTenderTypes,
+  const { data: tenderMethods } = useQuery({
+    queryKey: ["tender-methods"],
+    queryFn: fetchTenderMethods,
   });
 
   const { data, isLoading, isError, error } = useQuery({
@@ -145,11 +145,11 @@ export function TenderTable() {
             }}
           >
             <SelectTrigger className="w-full min-w-0">
-              <SelectValue placeholder="All categories" />
+              <SelectValue placeholder="All methods" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>All categories</SelectItem>
-              {tenderTypes?.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+              <SelectItem value={ALL}>All methods</SelectItem>
+              {tenderMethods?.map((method) => <SelectItem key={method} value={method}>{method}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

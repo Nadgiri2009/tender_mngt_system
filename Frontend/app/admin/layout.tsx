@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
   ArrowLeftCircle,
+  BadgeCheck,
   Building2,
   ClipboardList,
   FileText,
@@ -42,10 +43,11 @@ const ADMIN_GROUPS = [
     icon: Building2,
     items: [
       { href: "/admin/departments", label: "Departments", icon: Building2 },
+      { href: "/admin/master-data/designations", label: "Designation", icon: BadgeCheck },
       { href: "/admin/users", label: "Users", icon: Users },
       { href: "/admin/roles", label: "Roles & Permissions", icon: ShieldCheck },
       { href: "/admin/master-data/tender-methods", label: "Tender Methods", icon: Gavel },
-      { href: "/admin/master-data/tender-categories", label: "Tender Categories", icon: Tags },
+      { href: "/admin/master-data/tender-types", label: "Tender Types", icon: Tags },
       { href: "/admin/master-data/document-types", label: "Document Types", icon: Files },
       { href: "/admin/master-data/units", label: "Units of Measurement", icon: Ruler },
     ],

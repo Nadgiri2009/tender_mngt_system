@@ -11,6 +11,7 @@ namespace TenderManagement.Infrastructure.Data
         public DbSet<Permission> Permissions => Set<Permission>();
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
         public DbSet<Department> Departments => Set<Department>();
+        public DbSet<DesignationMaster> Designations => Set<DesignationMaster>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Contractor> Contractors => Set<Contractor>();
         public DbSet<Tender> Tenders => Set<Tender>();
@@ -76,6 +77,16 @@ namespace TenderManagement.Infrastructure.Data
                 e.Property(x => x.DepartmentName).IsRequired().HasMaxLength(150);
                 e.Property(x => x.HeadOfficerName).HasMaxLength(150);
                 e.HasIndex(x => x.DepartmentName).IsUnique();
+            });
+
+            modelBuilder.Entity<DesignationMaster>(e =>
+            {
+                e.ToTable("Designations");
+                e.HasKey(x => x.DesignationName);
+                e.Property(x => x.DesignationName).IsRequired().HasMaxLength(150);
+                e.Property(x => x.SortOrder).IsRequired();
+                e.Property(x => x.IsActive).IsRequired();
+                e.Property(x => x.CreatedAtUtc).HasColumnType("datetime2");
             });
 
             modelBuilder.Entity<User>(e =>

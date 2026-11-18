@@ -10,7 +10,7 @@ import { updateTenderSchema, type UpdateTenderFormValues } from "@/lib/validatio
 import { updateTender } from "@/lib/api/tenders";
 import { ApiError } from "@/lib/api/client";
 import type { TenderDetail } from "@/types/tender";
-import { fetchTenderCategories, fetchTenderTypes } from "@/lib/api/lookups";
+import { fetchTenderMethods, fetchTenderTypes } from "@/lib/api/lookups";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,17 +66,17 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
     },
   });
 
-  const tenderTypeValue = watch("tenderType");
-  const tenderCategoryValue = watch("tenderCategory");
+  const tenderMethodValue = watch("tenderType");
+  const tenderTypeValue = watch("tenderCategory");
   const isEditable = tender.currentStatus === "Draft";
 
+  const { data: tenderMethods } = useQuery({
+    queryKey: ["tender-methods"],
+    queryFn: fetchTenderMethods,
+  });
   const { data: tenderTypes } = useQuery({
     queryKey: ["tender-types"],
     queryFn: fetchTenderTypes,
-  });
-  const { data: tenderCategories } = useQuery({
-    queryKey: ["tender-categories"],
-    queryFn: fetchTenderCategories,
   });
 
   if (!isEditable) {
@@ -121,16 +121,16 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
           <div className="space-y-2">
             <Label htmlFor="tenderType">Tender Method</Label>
             <Select
-              value={tenderTypeValue}
+              value={tenderMethodValue}
               onValueChange={(v) => setValue("tenderType", v, { shouldValidate: true })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select tender type" />
+                <SelectValue placeholder="Select tender method" />
               </SelectTrigger>
               <SelectContent>
-                {tenderTypes?.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
+                {tenderMethods?.map((method) => (
+                  <SelectItem key={method} value={method}>
+                    {method}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -139,18 +139,18 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tenderCategory">Tender Category</Label>
+            <Label htmlFor="tenderCategory">Tender Type</Label>
             <Select
-              value={tenderCategoryValue}
+              value={tenderTypeValue}
               onValueChange={(v) => setValue("tenderCategory", v, { shouldValidate: true })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select tender category" />
+                <SelectValue placeholder="Select tender type" />
               </SelectTrigger>
               <SelectContent>
-                {tenderCategories?.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                {tenderTypes?.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
                   </SelectItem>
                 ))}
               </SelectContent>

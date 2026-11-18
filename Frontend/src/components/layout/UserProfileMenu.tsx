@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, CircleUserRound, LogOut } from "lucide-react";
+import Link from "next/link";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,14 @@ export function UserProfileMenu({ className, onLogout, appearance = "light" }: U
         <p className="mt-2 break-words text-sm font-semibold">{user.fullName}</p>
         <p className="mt-1 break-all text-sm text-muted-foreground">{user.email}</p>
         <p className="mt-1 break-words text-xs text-muted-foreground">{user.role}</p>
-        <Button type="button" variant="outline" size="sm" className="mt-4 w-full" onClick={handleLogout}>
+        <Link
+          href="/profile"
+          className="mt-4 flex items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          <CircleUserRound className="h-4 w-4" aria-hidden="true" />
+          Edit profile
+        </Link>
+        <Button type="button" variant="outline" size="sm" className="mt-2 w-full" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </Button>

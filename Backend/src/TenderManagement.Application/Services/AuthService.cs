@@ -188,6 +188,47 @@ namespace TenderManagement.Application.Services
                 "Registration complete. Sign in with your 10-digit mobile number and one-time code.");
         }
 
+        public async Task<UserProfileResponseDto?> GetProfileAsync(
+            int userId, CancellationToken cancellationToken)
+        {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId, cancellationToken);
+            return user is null || !user.IsActive
+                ? null
+                : new UserProfileResponseDto(user.UserId, user.FullName, user.Email, user.Mobile);
+        }
+
+        public async Task<UserProfileResponseDto> UpdateProfileAsync(
+            int userId,
+            UpdateUserProfileRequestDto request,
+            CancellationToken cancellationToken)
+        {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId, cancellationToken);
+            if (user is null || !user.IsActive)
+                throw new UnauthorizedAccessException("This account is no longer active.");
+
+            var fullName = request.FullName.Trim();
+            var email = request.Email.Trim();
+            if (string.IsNullOrWhiteSpace(fullName))
+                throw new BusinessRuleException("Full name is required.");
+
+            var duplicateEmail = await _unitOfWork.Users.FindAsync(
+                existing => existing.Email == email && existing.UserId != userId,
+                cancellationToken);
+            if (duplicateEmail.Any())
+                throw new BusinessRuleException("A user with this email already exists.");
+
+            user.FullName = fullName;
+            user.Email = email;
+            user.ModifiedBy = userId;
+            user.ModifiedDate = DateTime.UtcNow;
+            _unitOfWork.Users.Update(user);
+            await _unitOfWork.CompleteAsync(cancellationToken);
+            await _auditService.LogAsync(
+                userId, "UpdateProfile", nameof(User), userId, cancellationToken: cancellationToken);
+
+            return new UserProfileResponseDto(user.UserId, user.FullName, user.Email, user.Mobile);
+        }
+
         private static string? NormalizeMobile(string? mobile)
         {
             if (string.IsNullOrWhiteSpace(mobile))

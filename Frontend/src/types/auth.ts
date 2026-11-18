@@ -33,6 +33,18 @@ export interface RequestLoginOtpResponse {
   developmentOtp?: string | null;
 }
 
+export interface UserProfile {
+  userId: number;
+  fullName: string;
+  email: string;
+  mobile: string | null;
+}
+
+export interface UpdateUserProfileInput {
+  fullName: string;
+  email: string;
+}
+
 // Mirrors Backend RegisterRequestDto exactly
 export interface RegisterInput {
   fullName: string;

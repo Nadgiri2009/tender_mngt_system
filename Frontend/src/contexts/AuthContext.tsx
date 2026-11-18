@@ -21,6 +21,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   setSession: (auth: AuthResponse) => boolean;
+  updateProfile: (profile: Pick<AuthUser, "fullName" | "email">) => boolean;
   logout: () => void;
 }
 
@@ -76,6 +77,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, []);
 
+  const updateProfile = useCallback((profile: Pick<AuthUser, "fullName" | "email">) => {
+    if (!user) return false;
+    const token = getStoredToken();
+    const expiresAt = getStoredExpiry();
+    if (!token || expiresAt <= Date.now()) return false;
+
+    const updatedUser = { ...user, ...profile };
+    saveStoredSession(token, updatedUser, expiresAt);
+    setUser(updatedUser);
+    return true;
+  }, [user]);
+
   const logout = useCallback(() => {
     clearAuthSession();
     queryClient.clear();
@@ -112,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, queryClient, router, user]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, setSession, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, setSession, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

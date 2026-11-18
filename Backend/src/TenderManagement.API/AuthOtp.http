@@ -1,6 +1,7 @@
 @baseUrl = http://localhost:5050/api
-@mobile = 9876543210
+@mobile = replace-with-a-registered-10-digit-mobile-number
 @otp = replace-with-the-six-digit-developmentOtp-from-the-request-response
+@accessToken = replace-with-the-access-token-from-the-login-response
 
 ### Request a one-time sign-in code
 POST {{baseUrl}}/auth/request-otp
@@ -17,4 +18,18 @@ Content-Type: application/json
 {
   "mobile": "{{mobile}}",
   "otp": "{{otp}}"
+}
+
+### Read the authenticated user's profile
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+### Update the authenticated user's editable profile fields
+PUT {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "replace-with-the-current-or-new-name",
+  "email": "replace-with-the-current-or-new-email"
 }

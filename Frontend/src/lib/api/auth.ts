@@ -6,6 +6,8 @@ import type {
   RegisterResponse,
   RequestLoginOtpInput,
   RequestLoginOtpResponse,
+  UpdateUserProfileInput,
+  UserProfile,
 } from "@/types/auth";
 
 // POST /api/auth/request-otp
@@ -22,6 +24,24 @@ export async function requestLoginOtp(input: RequestLoginOtpInput): Promise<Requ
 export async function login(input: LoginInput): Promise<AuthResponse> {
   try {
     const { data } = await apiClient.post<AuthResponse>("/auth/login", input, { timeout: 15_000 });
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function fetchMyProfile(): Promise<UserProfile> {
+  try {
+    const { data } = await apiClient.get<UserProfile>("/auth/profile");
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function updateMyProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+  try {
+    const { data } = await apiClient.put<UserProfile>("/auth/profile", input);
     return data;
   } catch (error) {
     throw toApiError(error);

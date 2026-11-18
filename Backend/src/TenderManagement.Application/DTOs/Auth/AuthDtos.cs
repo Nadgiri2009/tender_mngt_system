@@ -13,6 +13,23 @@ namespace TenderManagement.Application.DTOs.Auth
     /// <summary>Response returned after requesting a one-time sign-in code.</summary>
     public sealed record RequestLoginOtpResponseDto(string Message, string? DevelopmentOtp = null);
 
+    /// <summary>Payload for updating the authenticated user's editable profile fields.</summary>
+    public sealed record UpdateUserProfileRequestDto
+    {
+        [Required, StringLength(150, MinimumLength = 2)]
+        public required string FullName { get; init; }
+
+        [Required, EmailAddress, StringLength(150)]
+        public required string Email { get; init; }
+    }
+
+    /// <summary>Profile fields returned for the authenticated user.</summary>
+    public sealed record UserProfileResponseDto(
+        int UserId,
+        string FullName,
+        string Email,
+        string? Mobile);
+
     /// <summary>Payload for verifying a one-time sign-in code.</summary>
     public sealed record LoginRequestDto
     {

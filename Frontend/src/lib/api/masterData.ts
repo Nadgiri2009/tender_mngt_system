@@ -4,6 +4,7 @@ import type { PagedResult } from "@/types/tender";
 export type MasterDataCatalog =
   | "tender-methods"
   | "tender-types"
+  | "designations"
   | "document-types"
   | "units";
 

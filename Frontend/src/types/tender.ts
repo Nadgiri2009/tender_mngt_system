@@ -1,8 +1,6 @@
 // Mirrors Backend/src/TenderManagement.Application/DTOs/Tender/TenderDtos.cs
-// Status and type option lists are NOT hardcoded here -- they're fetched at
-// runtime from GET /api/lookups/tender-statuses and /api/lookups/tender-types,
-// which read directly off the Domain.Enums.TenderStatus / TenderType const
-// classes. That's the single source of truth; see lib/api/lookups.ts.
+// Status, method, and type options are loaded from their SQL-backed lookup
+// endpoints at runtime; see lib/api/lookups.ts.
 
 export type TenderStatus = string;
 export type TenderType = string;
