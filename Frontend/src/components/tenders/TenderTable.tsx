@@ -18,10 +18,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/tenders/StatusBadge";
 import { PaginationControls } from "@/components/layout/PaginationControls";
 import { Search, FileWarning, Eye, Send } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ROLE_NAMES } from "@/types/auth";
 
 const ALL = "__all__";
 
 export function TenderTable() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(ALL);
   const [statusGroup, setStatusGroup] = useState<string>();
@@ -72,6 +75,21 @@ export function TenderTable() {
         sortDescending: true,
       }),
   });
+  const hasFilters =
+    Boolean(debouncedSearch) ||
+    status !== ALL ||
+    Boolean(statusGroup) ||
+    departmentId !== ALL ||
+    tenderType !== ALL ||
+    Boolean(dateFrom) ||
+    Boolean(dateTo);
+  const emptyMessage = hasFilters
+    ? "No tenders match your filters."
+    : !user
+      ? "No published tenders are available right now."
+      : user.accountType === "Internal" && user.role !== ROLE_NAMES.JuniorEngineer
+        ? "No tenders are currently assigned to your workflow role."
+        : "No tenders are available.";
 
   return (
     <div className="space-y-4">
@@ -235,7 +253,7 @@ export function TenderTable() {
             {!isLoading && !isError && data?.items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={12} className="py-12 text-center text-sm text-muted-foreground">
-                  No tenders match your filters.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}

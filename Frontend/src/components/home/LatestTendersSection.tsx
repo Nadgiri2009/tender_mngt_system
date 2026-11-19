@@ -53,13 +53,14 @@ export function LatestTendersSection() {
                 <TableHead className="text-right">Estimated Cost</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Published</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -69,7 +70,7 @@ export function LatestTendersSection() {
 
               {isError && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-destructive">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-destructive">
                     Could not load tenders right now.
                   </TableCell>
                 </TableRow>
@@ -77,7 +78,7 @@ export function LatestTendersSection() {
 
               {!isLoading && !isError && data?.items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                     No tenders published yet.
                   </TableCell>
                 </TableRow>
@@ -102,6 +103,11 @@ export function LatestTendersSection() {
                       <StatusBadge status={tender.currentStatus} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">{formatDate(tender.publicationDate)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/tenders/${tender.tenderId}`}>View Tender</Link>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
             </TableBody>

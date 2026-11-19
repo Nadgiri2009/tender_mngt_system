@@ -44,7 +44,8 @@ export default function RegisterPage() {
     mutationFn: (values: RegisterFormValues) => registerApi(values),
     onSuccess: (response) => {
       toast.success(response.message);
-      router.replace("/login");
+      const returnUrl = getAuthReturnUrl();
+      router.replace(returnUrl ? `/login?returnUrl=${encodeURIComponent(returnUrl)}` : "/login");
     },
     onError: (error: Error) => {
       setServerError(error instanceof ApiError ? error.message : error.message || "Registration failed.");

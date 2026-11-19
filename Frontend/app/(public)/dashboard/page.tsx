@@ -134,6 +134,10 @@ export default function RoleDashboardPage() {
         {MINI_CARDS.map((card) => {
           const Icon = card.icon;
           const value = stats?.[card.key];
+          const label =
+            card.key === "totalTenders" && user.role !== ROLE_NAMES.JuniorEngineer
+              ? "Assigned Tenders"
+              : card.label;
           return (
             <Card key={card.key} className="min-w-0">
               <CardContent className="flex items-center gap-2.5 p-3 sm:gap-3 sm:p-4">
@@ -142,7 +146,7 @@ export default function RoleDashboardPage() {
                 </div>
                 <div className="min-w-0">
                   {statsLoading ? <Skeleton className="h-6 w-8" /> : <p className="text-xl font-bold tabular-nums sm:text-2xl">{value ?? "—"}</p>}
-                  <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{card.label}</p>
+                  <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{label}</p>
                 </div>
               </CardContent>
             </Card>

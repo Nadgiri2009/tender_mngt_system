@@ -41,6 +41,7 @@ namespace TenderManagement.API.Middleware
                 BusinessRuleException => (HttpStatusCode.BadRequest, ex.Message),
                 ForbiddenActionException => (HttpStatusCode.Forbidden, ex.Message),
                 UnauthorizedAccessException => (HttpStatusCode.Unauthorized, ex.Message),
+                OtpRequestRateLimitException => (HttpStatusCode.TooManyRequests, ex.Message),
                 OtpDeliveryUnavailableException => (HttpStatusCode.ServiceUnavailable,
                     "One-time code delivery is not configured for this environment."),
                 _ => (HttpStatusCode.InternalServerError, "An unexpected error occurred. Please try again later.")
@@ -56,6 +57,11 @@ namespace TenderManagement.API.Middleware
             }
 
             context.Response.StatusCode = (int)statusCode;
+            if (ex is OtpRequestRateLimitException rateLimitException)
+            {
+                context.Response.Headers.RetryAfter =
+                    rateLimitException.RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
 
             var payload = JsonSerializer.Serialize(new
             {

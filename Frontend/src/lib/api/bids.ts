@@ -97,6 +97,21 @@ export async function submitFinancialBid(
   }
 }
 
+export async function saveJeFinancialData(
+  tenderId: number,
+  entries: { contractorId: number; bidAmount: number }[]
+): Promise<FinancialBidDto[]> {
+  try {
+    const { data } = await apiClient.post<FinancialBidDto[]>(
+      "/bids/financial/je-entry",
+      { tenderId, entries }
+    );
+    return data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
 // GET /api/bids/{tenderId}/financial - ranked L1 first
 export async function fetchFinancialBidsRanked(tenderId: number): Promise<FinancialBidDto[]> {
   try {

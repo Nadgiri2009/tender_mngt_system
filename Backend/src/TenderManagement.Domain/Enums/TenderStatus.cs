@@ -124,11 +124,29 @@ namespace TenderManagement.Domain.Enums
     public static class RoleNames
     {
         public const string JuniorEngineer = "Junior Engineer (JE)";
+        public const string JuniorEngineerCode = "JE";
         public const string TenderCell = "Tender Cell";
+        public const string TenderCellCode = "TENDER_CELL";
         public const string TenderCommitteeChairman = "Tender Committee Chairman (Nivida Samiti Adhyaksha)";
+        public const string TenderCommitteeChairmanCode = "CHAIRMAN";
         public const string DirectorAuditor = "Director Auditor";
+        public const string DirectorAuditorCode = "DIRECTOR_AUDITOR";
         public const string ExternalBidder = "ExternalBidder";
         public const string Disabled = "LegacyRoleDisabled";
+
+        public static bool IsJuniorEngineerRole(string? roleCode, string? roleName) =>
+            string.Equals(roleName, JuniorEngineer, StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(roleCode, JuniorEngineerCode, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(roleCode, JuniorEngineer, StringComparison.OrdinalIgnoreCase));
+
+        public static bool IsApprovedInternalRole(string? roleCode, string? roleName) =>
+            IsJuniorEngineerRole(roleCode, roleName) ||
+            (string.Equals(roleCode, TenderCellCode, StringComparison.OrdinalIgnoreCase) &&
+             string.Equals(roleName, TenderCell, StringComparison.OrdinalIgnoreCase)) ||
+            (string.Equals(roleCode, TenderCommitteeChairmanCode, StringComparison.OrdinalIgnoreCase) &&
+             string.Equals(roleName, TenderCommitteeChairman, StringComparison.OrdinalIgnoreCase)) ||
+            (string.Equals(roleCode, DirectorAuditorCode, StringComparison.OrdinalIgnoreCase) &&
+             string.Equals(roleName, DirectorAuditor, StringComparison.OrdinalIgnoreCase));
 
         public const string Admin = Disabled;
         public const string DepartmentOfficer = JuniorEngineer;

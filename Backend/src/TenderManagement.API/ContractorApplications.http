@@ -1,0 +1,114 @@
+@baseUrl = http://localhost:5050
+@contractorToken = replace-with-contractor-token
+@jeToken = replace-with-je-token
+@tenderCellToken = replace-with-assigned-tender-cell-token
+@tenderId = 1
+@applicationId = 1
+@documentId = 1
+
+### Publicly view a published tender
+GET {{baseUrl}}/api/tenders/{{tenderId}}
+
+### Publicly read a published tender's application document requirements
+GET {{baseUrl}}/api/bids/applications/tender/{{tenderId}}/requirements
+
+### JE: replace requirements on a draft tender
+PUT {{baseUrl}}/api/bids/applications/tender/{{tenderId}}/requirements
+Authorization: Bearer {{jeToken}}
+Content-Type: application/json
+
+[
+  {
+    "documentType": "Registration Certificate",
+    "description": "Upload a current business registration certificate.",
+    "isMandatory": true,
+    "allowedExtensions": ".pdf,.jpg,.png",
+    "maxFileSizeBytes": 10000000
+  }
+]
+
+### Contractor: save a draft with a private document upload
+POST {{baseUrl}}/api/bids/applications/drafts/{{tenderId}}
+Authorization: Bearer {{contractorToken}}
+Content-Type: multipart/form-data; boundary=ContractorDocument
+
+--ContractorDocument
+Content-Disposition: form-data; name="documentTypes"
+
+Registration Certificate
+--ContractorDocument
+Content-Disposition: form-data; name="files"; filename="registration.pdf"
+Content-Type: application/pdf
+
+< ./test-documents/registration.pdf
+--ContractorDocument--
+
+### Contractor: submit a saved application after required documents are present
+POST {{baseUrl}}/api/bids/applications/{{applicationId}}/submit
+Authorization: Bearer {{contractorToken}}
+Content-Type: application/json
+
+{
+  "termsAccepted": true,
+  "termsVersion": "portal-terms-v1"
+}
+
+### Contractor: view own dashboard and notifications
+GET {{baseUrl}}/api/bids/applications/dashboard
+Authorization: Bearer {{contractorToken}}
+
+### Contractor: mark own notification as read
+PUT {{baseUrl}}/api/bids/applications/notifications/1/read
+Authorization: Bearer {{contractorToken}}
+
+### JE or assigned Tender Cell: list applications
+GET {{baseUrl}}/api/bids/applications
+Authorization: Bearer {{jeToken}}
+
+### JE or assigned Tender Cell: view scoped application details
+GET {{baseUrl}}/api/bids/applications/{{applicationId}}
+Authorization: Bearer {{jeToken}}
+
+### Tender Cell: verify an uploaded document or request correction
+PUT {{baseUrl}}/api/bids/applications/{{applicationId}}/documents/{{documentId}}/verification
+Authorization: Bearer {{tenderCellToken}}
+Content-Type: application/json
+
+{
+  "verificationStatus": "Shortfall",
+  "remarks": "Please upload a current, legible copy."
+}
+
+### JE or assigned Tender Cell: add an immutable clarification
+POST {{baseUrl}}/api/bids/applications/{{applicationId}}/remarks
+Authorization: Bearer {{jeToken}}
+Content-Type: application/json
+
+{
+  "message": "Please provide the missing supporting document.",
+  "remarkType": "Clarification"
+}
+
+### Contractor: respond to a clarification
+POST {{baseUrl}}/api/bids/applications/{{applicationId}}/remarks
+Authorization: Bearer {{contractorToken}}
+Content-Type: application/json
+
+{
+  "message": "The corrected document has been uploaded.",
+  "remarkType": "Response"
+}
+
+### JE or assigned Tender Cell: record a technical decision
+PUT {{baseUrl}}/api/bids/applications/{{applicationId}}/evaluation
+Authorization: Bearer {{jeToken}}
+Content-Type: application/json
+
+{
+  "decision": "Qualified",
+  "remarks": "Mandatory documents were verified."
+}
+
+### Download an application document; authorization is checked before streaming
+GET {{baseUrl}}/api/bids/applications/{{applicationId}}/documents/{{documentId}}
+Authorization: Bearer {{jeToken}}

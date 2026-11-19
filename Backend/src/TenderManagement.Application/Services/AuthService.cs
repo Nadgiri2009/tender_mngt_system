@@ -69,10 +69,13 @@ namespace TenderManagement.Application.Services
                 user?.UserId,
                 code,
                 now,
-                now.AddMinutes(5));
+                now.AddMinutes(5),
+                out var retryAfterSeconds);
+            if (!canSend)
+                throw new OtpRequestRateLimitException(retryAfterSeconds);
 
             string? developmentOtp = null;
-            if (user is not null && canSend)
+            if (user is not null)
             {
                 await _otpDeliveryService.SendAsync(mobile, code, cancellationToken);
                 if (_otpDeliveryService.CanExposeOtp)
@@ -164,16 +167,14 @@ namespace TenderManagement.Application.Services
             };
 
             await _unitOfWork.Users.AddAsync(user, cancellationToken);
-            await _unitOfWork.CompleteAsync(cancellationToken);
-
             await _unitOfWork.Contractors.AddAsync(new Contractor
             {
                 Name = request.CompanyName.Trim(),
-                RegistrationNo = $"PORTAL-{user.UserId:D8}",
+                RegistrationNo = $"PORTAL-{Guid.NewGuid():N}",
                 Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
                 ContactNo = user.Mobile,
                 Email = user.Email,
-                UserId = user.UserId,
+                User = user,
                 IsActive = true
             }, cancellationToken);
             await _unitOfWork.CompleteAsync(cancellationToken);

@@ -44,6 +44,11 @@ permissions and workflow transitions, and validates the final four-role
 catalog. It does not drop the database or business tables. Obsolete permission
 grants are written to `AuditLog` before they are removed.
 
+Existing databases that have already recorded `13-FOUR-ROLE` must also run
+[`Migrations/14_FIX_TENDER_WORKFLOW_TRANSITIONS.sql`](./Migrations/14_FIX_TENDER_WORKFLOW_TRANSITIONS.sql).
+It aligns the live transition procedure with version-2 assignments and history,
+and is guarded to run only against `tender_tracking`.
+
 Known label normalization supported by the migration:
 
 | Existing role label | Canonical role code |
@@ -73,14 +78,22 @@ For a fresh `tender_tracking` installation:
 
 1. Run `SMC_TENDER_DATABASE.sql` in Fresh mode against an empty database.
 2. Run the four-role migration with SQLCMD against `tender_tracking`.
-3. Verify the four roles, permission grants, transitions, and account assignments
+3. Run `14_FIX_TENDER_WORKFLOW_TRANSITIONS.sql` against `tender_tracking`.
+4. Verify the four roles, permission grants, transitions, and account assignments
    before enabling logins.
 
 For an upgrade, take and verify a restorable backup, rehearse on a copy, run the
-base installer in Upgrade mode, and then run the four-role migration. The
-migration's guard is deliberate: an existing catalog containing non-canonical
-roles must be mapped and reviewed before applying it. Never point either
-command at `TenderManagementDB` as part of this task.
+base installer in Upgrade mode, then run the four-role migration followed by
+`14_FIX_TENDER_WORKFLOW_TRANSITIONS.sql`, `15_ADD_TENDER_ELIGIBILITY_AND_APPLICATION_REQUIREMENTS.sql`,
+and `16_ADD_CONTRACTOR_APPLICATION_HISTORY.sql`. The migration's guard is deliberate:
+an existing catalog containing non-canonical roles must be mapped and reviewed
+before applying it. Never point these scripts at `TenderManagementDB`.
+
+The contractor application additions are additive and reuse `Contractor`,
+`TechnicalBid`, `TechnicalBidDocuments`, `TenderRequiredBidDocuments`, and
+`TenderNotifications`. Migration 15 adds tender eligibility and
+requirement metadata; migration 16 adds immutable application history and
+remarks. Both have been applied to `tender_tracking`.
 
 There is no separate trusted-user bootstrap script. Internal users must be
 provisioned through a separately authorized process with verified mobile
@@ -90,21 +103,24 @@ numbers, department assignments and audit evidence.
 
 The migration configures 11 version-2 transitions in `WorkflowTransitions`. The
 stored procedure `dbo.sp_UpdateTenderStatus` checks the configured transition,
-active role, account type, role permission, expected status and Junior Engineer (JE) department
-before updating the tender and inserting `ApprovalHistory` atomically.
+active role, account type, role permission, expected status, current assignment,
+and Junior Engineer (JE) department. It atomically updates the tender, closes
+the current assignment, records `ApprovalHistory` and `TenderWorkflowHistory`,
+and creates the next role assignment.
 
 | Workflow area | Current implementation status |
 |---|---|
 | Junior Engineer (JE) tender creation/publication and technical opening | Role permissions and transitions are configured; existing UI/API paths are not yet proven end-to-end for version 2. |
-| Tender Cell document verification | Permission and status transition are configured. Bidder/document verification data operations and the complete Tender Cell queue are not integrated end-to-end. |
-| Shortfall generation, approval and response | Role grants exist and the schema supports shortfall items, submissions and deadlines. The API transition only changes status/history; it does not create shortfall rows, upload bidder responses, enforce the three-calendar-day deadline, or clear/re-verify each item. |
+| Tender Cell document verification | Contractor application documents, reviewer assignment checks, verification history, and qualification decisions are implemented. The existing Tender Cell workflow assignment/queue still needs end-to-end verification. |
+| Shortfall generation, approval and response | Application clarifications, contractor responses, notifications, and immutable history are implemented. Integration with the existing `TenderShortfalls` tables, three-calendar-day deadline, and item-by-item clearance/re-verification remain outstanding. |
 | Chairman financial-opening approval | Role permission and transition are configured. The financial-opening record and bidder-level data are not atomically integrated with this action. |
 | Junior Engineer (JE) financial data entry | Transition is configured; bidder-level financial bid entry is not integrated with this transition. |
 | Director Auditor review/approval | Permission and transition are configured. A complete financial review record/evidence workflow remains to be integrated. |
 | Junior Engineer (JE) Work Order and Tender Agreement | Correct role grants and terminal transitions are configured. Existing API create methods can record basic records, but they are not coupled to transitions and do not yet provide versioned PDF/DOCX generation or upload/history. |
 | Pre-bill and measurement | Junior Engineer (JE) permissions exist; API measurement entry is Junior Engineer (JE)-only. Full dashboard and workflow verification remains outstanding. |
-| Workflow assignment | The schema contains `TenderWorkflowAssignments`, but the API transition service does not yet enforce a matching active assignment or maintain assignment rows after each transition. Role/status checks alone are not a substitute. |
+| Workflow assignment | The API validates the actor's department and role before a transition. The database procedure also validates the configured transition, role permission, active assignment and department; it closes the current assignment, records `ApprovalHistory` and `TenderWorkflowHistory`, and creates the next role assignment atomically. |
 | Workflow configuration UI | Transitions are migration-controlled. There is no safe UI/API to edit transition rules. `workflow.configure` is a grant only, not a completed administration feature. |
+| Contractor registration and applications | External contractor registration/login, tender-specific requirements, drafts/submission, private document storage, duplicate protection, contractor dashboards, JE/Tender Cell review, remarks, and application history are implemented using the existing four internal roles. A successful submission and upload still need live end-to-end validation against a published tender. |
 
 The transition sequence in the migration follows the previously confirmed
 business clarification: Junior Engineer (JE) opens the financial-data stage after the Chairman's
@@ -175,14 +191,23 @@ business direction.
 - SQL Server query against `tender_tracking`: exactly four active internal
   roles (`Junior Engineer (JE)`, `TENDER_CELL`, `CHAIRMAN`, `DIRECTOR_AUDITOR`); one assigned user
   for each; 11 active version-2 transitions.
+- JE user 1 has the Road department assignment required for the existing Road tender.
+- The version-2 Submit procedure is verified in a rollback transaction so the
+  tender status and history remain unchanged during the check.
 - SQL Server query: no active transition points to an invalid role code or
   missing permission.
+- Migrations 15 and 16 were applied to `tender_tracking`; no sample application
+  or tender records were created. The database has no published tender, so a
+  positive contractor submission could not be exercised.
+- Local API smoke check: Swagger returned HTTP 200, the unauthenticated
+  contractor dashboard returned HTTP 401, and public requirements for the
+  existing draft tender returned HTTP 404.
 - `dotnet build Backend\TenderManagement.sln --no-restore`: passed with 0
   warnings and 0 errors.
 - `dotnet build Frontend\DepartmentModule.csproj --no-restore`: passed with 0
   warnings and 0 errors.
 - `npm run build` in `Frontend`: passed, including type checking and static
-  generation.
+  generation of the contractor application pages and public tender details.
 - `git diff --check`: passed.
 
 **Superseded verification note:** the migration source now grants `users.manage`,
@@ -193,11 +218,13 @@ The current frontend also includes a mobile collapsible admin navigation,
 department/user/role permission pages, and shared numbered pagination; the
 tender listing uses the same server-side 10-record pagination controls.
 
-These are build/schema checks, not end-to-end business workflow tests. No
-functional tests were run for unauthorized requests, assignment scoping,
-shortfall deadlines, bidder uploads, financial confidentiality, PDF/DOCX
-generation, fresh-install-plus-migration rehearsal, or historical data
-preservation on a populated legacy database.
+These checks do not prove a successful contractor application. Registration,
+OTP, submission, private document retrieval, reviewer actions, clarification
+response, and isolation between two contractors still require an end-to-end
+test once a published tender and an approved test identity are available.
+Shortfall deadlines, financial confidentiality, PDF/DOCX generation,
+fresh-install-plus-migration rehearsal, and historical data preservation on a
+populated legacy database also remain unverified.
 
 ## Remaining work before acceptance
 

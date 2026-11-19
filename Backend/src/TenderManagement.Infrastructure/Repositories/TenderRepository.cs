@@ -143,10 +143,19 @@ namespace TenderManagement.Infrastructure.Repositories
             return (items, total);
         }
 
-        public async Task<List<Tender>> GetDashboardTendersAsync(int? createdByUserId, int limit, bool upcomingOnly)
+        public async Task<List<Tender>> GetDashboardTendersAsync(
+            int? createdByUserId,
+            int limit,
+            bool upcomingOnly,
+            IReadOnlyCollection<int>? allowedTenderIds = null)
         {
             var query = _dbSet.Include(t => t.Department).Include(t => t.CreatedByUser)
                 .Include(t => t.ApprovalHistories).AsNoTracking();
+
+            if (allowedTenderIds is not null)
+            {
+                query = query.Where(t => allowedTenderIds.Contains(t.TenderId));
+            }
 
             if (createdByUserId.HasValue)
             {

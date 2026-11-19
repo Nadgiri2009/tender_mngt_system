@@ -58,6 +58,24 @@ namespace TenderManagement.Application.DTOs.Bid
         public decimal BidAmount { get; set; }
     }
 
+    public class SaveJeFinancialDataEntryDto
+    {
+        [Required, Range(1, int.MaxValue)]
+        public int ContractorId { get; set; }
+
+        [Required, Range(0.01, double.MaxValue, ErrorMessage = "Bid amount must be greater than zero.")]
+        public decimal BidAmount { get; set; }
+    }
+
+    public class SaveJeFinancialDataDto
+    {
+        [Required, Range(1, int.MaxValue)]
+        public int TenderId { get; set; }
+
+        [MinLength(1, ErrorMessage = "At least one financial bid is required.")]
+        public List<SaveJeFinancialDataEntryDto> Entries { get; set; } = new();
+    }
+
     public class FinancialBidDto
     {
         public int FinancialBidId { get; set; }

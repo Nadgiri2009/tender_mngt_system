@@ -22,6 +22,7 @@ namespace TenderManagement.API.Controllers
         /// <summary>POST /api/documents/upload - multipart form: tenderId, documentType, file</summary>
         [HttpPost("upload")]
         [Authorize(Roles = RoleNames.JuniorEngineer)]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [RequestSizeLimit(20_000_000)]
         public async Task<IActionResult> Upload([FromForm] UploadDocumentRequest request)
         {

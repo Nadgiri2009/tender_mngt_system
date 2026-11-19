@@ -179,8 +179,34 @@ namespace TenderManagement.Application.Services
             return ToDto(bid, contractor?.Name ?? string.Empty);
         }
 
-        public async Task<List<TechnicalBidDto>> GetTechnicalBidsAsync(int tenderId)
+        public async Task<List<TechnicalBidDto>> GetTechnicalBidsAsync(
+            int tenderId, int currentUserId, bool tenderCell)
         {
+            var user = await _unitOfWork.Users.GetByIdAsync(currentUserId)
+                ?? throw new ForbiddenActionException("The authenticated account is unavailable.");
+            var role = user.RoleId.HasValue
+                ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value)
+                : null;
+            if (!user.IsActive || user.AccountType != "Internal" || role is null || !role.IsActive)
+                throw new ForbiddenActionException("An active internal account is required to review applications.");
+            if (tenderCell)
+            {
+                if (!string.Equals(role.RoleCode, RoleNames.TenderCellCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(role.RoleName, RoleNames.TenderCell, StringComparison.OrdinalIgnoreCase))
+                    throw new ForbiddenActionException("The authenticated role cannot review contractor applications.");
+                var assignments = await _unitOfWork.TenderWorkflowAssignments.FindAsync(assignment =>
+                    assignment.TenderId == tenderId &&
+                    assignment.IsCurrent &&
+                    assignment.AssignedRoleId == role.RoleId &&
+                    (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == currentUserId));
+                if (!assignments.Any())
+                    throw new ForbiddenActionException("This tender is not assigned to the authenticated Tender Cell user.");
+            }
+            else if (!RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
+            {
+                throw new ForbiddenActionException("Only a Junior Engineer can view all contractor applications.");
+            }
+
             var bids = await _unitOfWork.TechnicalBids.FindAsync(b => b.TenderId == tenderId);
             var result = new List<TechnicalBidDto>();
             foreach (var b in bids)
@@ -191,11 +217,13 @@ namespace TenderManagement.Application.Services
             return result;
         }
 
-        public async Task<FinancialBidDto> SubmitFinancialBidAsync(SubmitFinancialBidDto dto)
+        public async Task<FinancialBidDto> SubmitFinancialBidAsync(SubmitFinancialBidDto dto, int currentUserId)
         {
             _ = await _unitOfWork.Tenders.GetByIdAsync(dto.TenderId) ?? throw new NotFoundException(nameof(Tender), dto.TenderId);
             var contractor = await _unitOfWork.Contractors.GetByIdAsync(dto.ContractorId)
                 ?? throw new NotFoundException(nameof(Contractor), dto.ContractorId);
+            if (contractor.UserId != currentUserId || !contractor.IsActive)
+                throw new NotFoundException(nameof(Contractor), dto.ContractorId);
 
             // Only contractors whose technical bid was qualified may submit a financial bid.
             var techBids = await _unitOfWork.TechnicalBids.FindAsync(b => b.TenderId == dto.TenderId && b.ContractorId == dto.ContractorId);
@@ -227,6 +255,83 @@ namespace TenderManagement.Application.Services
                 Rank = bid.Rank,
                 Status = bid.Status
             };
+        }
+
+        public async Task<List<FinancialBidDto>> SaveJeFinancialDataAsync(
+            SaveJeFinancialDataDto dto,
+            int currentUserId)
+        {
+            var tender = await _unitOfWork.Tenders.GetByIdAsync(dto.TenderId)
+                ?? throw new NotFoundException(nameof(Tender), dto.TenderId);
+            if (tender.CurrentStatus != TenderStatus.FinancialBidOpeningApproved)
+            {
+                throw new BusinessRuleException(
+                    "Financial bid data can only be entered after the Chairman approves financial bid opening.");
+            }
+
+            var user = await _unitOfWork.Users.GetByIdAsync(currentUserId)
+                ?? throw new ForbiddenActionException("The authenticated account is unavailable.");
+            var role = user.RoleId.HasValue
+                ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value)
+                : null;
+            if (!user.IsActive || user.AccountType != "Internal" ||
+                role is null || !role.IsActive ||
+                !RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
+            {
+                throw new ForbiddenActionException("Only an active Junior Engineer can enter financial bid data.");
+            }
+
+            if (dto.Entries.Count == 0 ||
+                dto.Entries.Select(entry => entry.ContractorId).Distinct().Count() != dto.Entries.Count)
+            {
+                throw new BusinessRuleException("Enter one positive bid amount for each contractor exactly once.");
+            }
+
+            var saved = new List<FinancialBid>();
+            foreach (var entry in dto.Entries)
+            {
+                if (entry.BidAmount <= 0)
+                    throw new BusinessRuleException("Bid amount must be greater than zero.");
+
+                var contractor = await _unitOfWork.Contractors.GetByIdAsync(entry.ContractorId)
+                    ?? throw new NotFoundException(nameof(Contractor), entry.ContractorId);
+                if (!contractor.IsActive)
+                    throw new BusinessRuleException("The selected contractor is inactive.");
+
+                var technicalBids = await _unitOfWork.TechnicalBids.FindAsync(
+                    bid => bid.TenderId == dto.TenderId && bid.ContractorId == entry.ContractorId);
+                if (!technicalBids.Any(bid => bid.Status == "Qualified"))
+                    throw new BusinessRuleException("Financial bid data can only be entered for a qualified contractor.");
+
+                var existing = (await _unitOfWork.FinancialBids.FindAsync(
+                    bid => bid.TenderId == dto.TenderId && bid.ContractorId == entry.ContractorId)).FirstOrDefault();
+                if (existing is null)
+                {
+                    existing = new FinancialBid
+                    {
+                        TenderId = dto.TenderId,
+                        ContractorId = entry.ContractorId,
+                        BidAmount = entry.BidAmount,
+                        Status = "Submitted",
+                        SubmittedDate = DateTime.UtcNow
+                    };
+                    await _unitOfWork.FinancialBids.AddAsync(existing);
+                }
+                else
+                {
+                    existing.BidAmount = entry.BidAmount;
+                    if (existing.Status == "Rejected" || existing.Status == "Selected")
+                        throw new BusinessRuleException("A finalized financial bid cannot be changed.");
+                    _unitOfWork.FinancialBids.Update(existing);
+                }
+                saved.Add(existing);
+            }
+
+            await _unitOfWork.CompleteAsync();
+            await _auditService.LogAsync(currentUserId, "EnterFinancialBidData", nameof(FinancialBid), dto.TenderId,
+                $"{saved.Count} financial bid record(s) saved");
+
+            return await GetFinancialBidsRankedAsync(dto.TenderId);
         }
 
         public async Task<List<FinancialBidDto>> GetFinancialBidsRankedAsync(int tenderId)

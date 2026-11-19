@@ -43,10 +43,12 @@ reusable OTP is configured. Production and non-local requests currently return
 `role` (role name — used by
 `[Authorize(Roles = "...")]`), and a custom `roleId` claim (used by the pending-approvals/dashboard
 endpoints to avoid an extra DB round-trip per request). Contractor registration does not collect a
-password; sign-in uses the registered mobile and OTP. The local `tender_tracking` database has an
-enabled Junior Engineer (JE) development placeholder (`0000000001`); it is not a real phone number and must never
-be enabled in production. Replace it with a verified mobile number before using the account outside
-local OTP testing.
+password; sign-in uses the registered mobile and OTP. In the local `tender_tracking` database, the
+four development staff placeholders are active for local OTP testing: JE (`0000000001`), Tender
+Cell (`0000000002`), Tender Committee Chairman (`0000000003`), and Director Auditor
+(`0000000004`). These are not real phone numbers and must never be enabled in production. If a
+request is inside the 60-second cooldown or three-request window, the API returns `429` with a
+`Retry-After` header instead of advancing to an OTP form without issuing a new code.
 
 ## Endpoints
 

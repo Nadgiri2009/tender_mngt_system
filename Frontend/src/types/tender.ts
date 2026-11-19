@@ -54,6 +54,11 @@ export interface TenderDocument {
 
 export interface TenderDetail extends TenderListItem {
   description: string | null;
+  eligibilityCriteria: string | null;
+  preBidMeetingUtc: string | null;
+  preBidLocation: string | null;
+  preBidDetails: string | null;
+  technicalBidOpeningScheduledUtc: string | null;
   createdByName: string;
   boqItems: BOQItem[];
   documents: TenderDocument[];
@@ -63,6 +68,7 @@ export interface TenderDetail extends TenderListItem {
 export interface CreateTenderInput {
   title: string;
   description?: string;
+  eligibilityCriteria?: string;
   departmentId: number;
   estimatedAmount: number;
   tenderType: string;
@@ -84,6 +90,7 @@ export interface CreateTenderInput {
 export interface UpdateTenderInput {
   title: string;
   description?: string;
+  eligibilityCriteria?: string;
   estimatedAmount: number;
   tenderType: string;
   tenderCategory: string;

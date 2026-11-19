@@ -95,10 +95,12 @@ namespace TenderManagement.API.Controllers
         /// <summary>POST /api/tenders - Junior Engineer (JE) Main Admin creates a tender (multipart: json + files)</summary>
         [HttpPost]
         [Authorize(Roles = RoleNames.JuniorEngineer)]
+        [Consumes("multipart/form-data")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [RequestSizeLimit(DocumentUploadRules.MaxRequestBytes)]
         public async Task<IActionResult> Create(
             [FromForm] string tenderJson,
-            [FromForm] List<IFormFile>? files,
+            [FromForm] IFormFileCollection? files,
             [FromForm] IFormFile? preBidDocument)
         {
             if (string.IsNullOrWhiteSpace(tenderJson)) return BadRequest("tenderJson is required");
@@ -124,7 +126,7 @@ namespace TenderManagement.API.Controllers
                 ModelState.AddModelError(nameof(dto.PreBidMeetingUtc), "Upload the pre-bid meeting suggestion when a meeting is scheduled.");
             }
 
-            var uploads = (files ?? new List<IFormFile>())
+            var uploads = (files?.Cast<IFormFile>() ?? Enumerable.Empty<IFormFile>())
                 .Concat(preBidDocument is null ? Enumerable.Empty<IFormFile>() : new[] { preBidDocument });
             foreach (var file in uploads)
             {

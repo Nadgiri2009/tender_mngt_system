@@ -35,6 +35,7 @@ const submissionDateSchema = z.string().optional().or(z.literal(""));
 export const createTenderSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
+  eligibilityCriteria: z.string().max(4000, "Eligibility criteria must be under 4000 characters").optional().or(z.literal("")),
   // Mirrors [Required, Range(1, int.MaxValue)] -- DepartmentId is nullable on the
   // backend so it can distinguish "not selected" from "0", but a valid tender
   // always needs a real department id > 0.
@@ -101,6 +102,7 @@ export const createTenderSchema = z.object({
 export const updateTenderSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
+  eligibilityCriteria: z.string().max(4000, "Eligibility criteria must be under 4000 characters").optional().or(z.literal("")),
   estimatedAmount: estimatedAmountSchema,
   tenderType: tenderTypeSchema,
   tenderCategory: tenderCategorySchema,

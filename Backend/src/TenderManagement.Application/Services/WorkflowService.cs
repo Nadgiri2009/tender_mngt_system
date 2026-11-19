@@ -56,6 +56,24 @@ namespace TenderManagement.Application.Services
                 : null;
             if (role is null || !role.IsActive)
                 throw new ForbiddenActionException("The authenticated role is not permitted to act on this workflow.");
+            if (RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName) &&
+                (!user.DepartmentId.HasValue || tender.DepartmentId != user.DepartmentId.Value))
+            {
+                throw new ForbiddenActionException("Your account is not assigned to this tender's department.");
+            }
+
+            var assignments = await _unitOfWork.TenderWorkflowAssignments.FindAsync(assignment =>
+                assignment.TenderId == tenderId &&
+                assignment.ShortfallId == null &&
+                assignment.IsCurrent &&
+                assignment.AssignedRoleId == roleId &&
+                assignment.DepartmentId == tender.DepartmentId &&
+                (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == currentUserId) &&
+                (!user.DepartmentId.HasValue || assignment.DepartmentId == user.DepartmentId.Value));
+            if (assignments.Count() != 1)
+            {
+                throw new ForbiddenActionException("The tender is not assigned to your workflow role or department.");
+            }
 
             var matches = await _unitOfWork.WorkflowTransitions.FindAsync(transition =>
                 transition.IsActive &&
@@ -71,6 +89,18 @@ namespace TenderManagement.Application.Services
 
             var stage = await _unitOfWork.WorkflowStages.GetByIdAsync(configuredTransition.StageId)
                 ?? throw new InvalidOperationException("The configured workflow stage no longer exists.");
+
+            if (string.Equals(actionName, "EnterFinancialData", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
+                    throw new ForbiddenActionException("Only an active Junior Engineer can enter financial bid data.");
+                if (tender.CurrentStatus != TenderStatus.FinancialBidOpeningApproved)
+                    throw new BusinessRuleException("Financial bid data entry is not available at the current tender stage.");
+                var financialBids = await _unitOfWork.FinancialBids.FindAsync(
+                    bid => bid.TenderId == tenderId);
+                if (!financialBids.Any())
+                    throw new BusinessRuleException("Enter at least one financial bid amount before advancing the workflow.");
+            }
 
             await _unitOfWork.ExecuteWorkflowTransitionAsync(
                 tenderId,
@@ -151,7 +181,7 @@ namespace TenderManagement.Application.Services
                 roleId,
                 userId,
                 user.DepartmentId,
-                role.RoleCode == "Junior Engineer (JE)");
+                RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName));
 
             var items = tenders.Select(tender => new PendingApprovalDto
             {
@@ -181,13 +211,37 @@ namespace TenderManagement.Application.Services
 
         public async Task<DashboardStatsDto> GetDashboardStatsAsync(int userId, int roleId)
         {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId)
+                ?? throw new ForbiddenActionException("The authenticated account is unavailable.");
             var role = await _unitOfWork.Roles.GetByIdAsync(roleId)
                 ?? throw new NotFoundException(nameof(Role), roleId);
-            var createdByUserId = role.RoleCode == "Junior Engineer (JE)" ? userId : (int?)null;
-            var allTenders = (await _unitOfWork.Tenders.FindAsync(tender =>
-                !tender.IsDeleted && (!createdByUserId.HasValue || tender.CreatedBy == createdByUserId.Value))).ToList();
-            var recentTenders = await _unitOfWork.Tenders.GetDashboardTendersAsync(createdByUserId, 5, upcomingOnly: false);
-            var upcomingDeadlines = await _unitOfWork.Tenders.GetDashboardTendersAsync(createdByUserId, 5, upcomingOnly: true);
+            if (!user.IsActive || user.AccountType != "Internal" ||
+                user.RoleId != roleId || !role.IsActive)
+            {
+                throw new ForbiddenActionException("The authenticated role is not permitted to view this dashboard.");
+            }
+
+            var isJuniorEngineer = RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName);
+            IReadOnlyCollection<int>? allowedTenderIds = null;
+            if (!isJuniorEngineer)
+            {
+                var assignments = await _unitOfWork.TenderWorkflowAssignments.FindAsync(assignment =>
+                    assignment.IsCurrent &&
+                    assignment.ShortfallId == null &&
+                    assignment.AssignedRoleId == roleId &&
+                    (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == userId) &&
+                    (!user.DepartmentId.HasValue || assignment.DepartmentId == user.DepartmentId.Value));
+                allowedTenderIds = assignments.Select(assignment => assignment.TenderId).Distinct().ToArray();
+            }
+
+            var allTenders = allowedTenderIds is null
+                ? (await _unitOfWork.Tenders.FindAsync(tender => !tender.IsDeleted)).ToList()
+                : (await _unitOfWork.Tenders.FindAsync(tender =>
+                    !tender.IsDeleted && allowedTenderIds.Contains(tender.TenderId))).ToList();
+            var recentTenders = await _unitOfWork.Tenders.GetDashboardTendersAsync(
+                null, 5, upcomingOnly: false, allowedTenderIds: allowedTenderIds);
+            var upcomingDeadlines = await _unitOfWork.Tenders.GetDashboardTendersAsync(
+                null, 5, upcomingOnly: true, allowedTenderIds: allowedTenderIds);
 
             return new DashboardStatsDto
             {
@@ -259,13 +313,20 @@ namespace TenderManagement.Application.Services
 
             var tender = await _unitOfWork.Tenders.GetByIdAsync(tenderId)
                 ?? throw new NotFoundException(nameof(Tender), tenderId);
+            var isJuniorEngineer = RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName);
+            if (isJuniorEngineer &&
+                (!user.DepartmentId.HasValue || tender.DepartmentId != user.DepartmentId.Value))
+            {
+                return new List<WorkflowActionOptionDto>();
+            }
+
             var assignments = await _unitOfWork.TenderWorkflowAssignments.FindAsync(assignment =>
                 assignment.TenderId == tenderId &&
                 assignment.ShortfallId == null &&
                 assignment.IsCurrent &&
                 assignment.AssignedRoleId == roleId &&
                 (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == userId) &&
-                (role.RoleCode == "Junior Engineer (JE)" || !user.DepartmentId.HasValue || assignment.DepartmentId == user.DepartmentId.Value));
+                (!user.DepartmentId.HasValue || assignment.DepartmentId == user.DepartmentId.Value));
             if (tender.WorkflowVersion != 2 || assignments.Count() != 1)
                 return new List<WorkflowActionOptionDto>();
 

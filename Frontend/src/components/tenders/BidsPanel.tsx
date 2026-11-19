@@ -13,6 +13,7 @@ import {
   submitTechnicalBid,
   evaluateTechnicalBid,
   submitFinancialBid,
+  saveJeFinancialData,
   selectContractor,
   isBidStageOrLater,
   type TechnicalBidDto,
@@ -62,6 +63,7 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
   const queryClient = useQueryClient();
   const isContractor = user?.accountType === "ExternalBidder";
   const isInternal = user?.accountType === "Internal";
+  const isJe = user?.role === "Junior Engineer (JE)";
   const canReadTechnical = user?.role === "Junior Engineer (JE)" || user?.role === "Tender Cell";
   const canReadFinancial = user?.role === "Junior Engineer (JE)" ||
     user?.role === "Tender Committee Chairman (Nivida Samiti Adhyaksha)" ||
@@ -77,6 +79,7 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
   const [techContractorId, setTechContractorId] = useState<string>("");
   const [techDocPath, setTechDocPath] = useState("");
   const [finAmount, setFinAmount] = useState("");
+  const [jeFinancialAmounts, setJeFinancialAmounts] = useState<Record<number, string>>({});
   const [selectRemarks, setSelectRemarks] = useState<Record<number, string>>({});
 
   const relevant = isBidStageOrLater(currentStatus);
@@ -104,7 +107,8 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
   const { data: contractorList } = useQuery({
     queryKey: ["contractors"],
     queryFn: fetchContractors,
-    enabled: false,
+    enabled: isAuthenticated && isInternal &&
+      user?.role === "Junior Engineer (JE)",
   });
 
   const invalidateBids = () => {
@@ -145,6 +149,25 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
       invalidateBids();
     },
     onError: (error: ApiError) => toast.error(error.message || "Failed to submit financial bid."),
+  });
+
+  const saveJeFinancialMutation = useMutation({
+    mutationFn: () =>
+      saveJeFinancialData(
+        tenderId,
+        (technicalBids ?? [])
+          .filter((bid) => bid.status === "Qualified")
+          .map((bid) => ({
+            contractorId: bid.contractorId,
+            bidAmount: Number(jeFinancialAmounts[bid.contractorId]),
+          }))
+          .filter((entry) => Number.isFinite(entry.bidAmount) && entry.bidAmount > 0)
+      ),
+    onSuccess: () => {
+      toast.success("Financial bid data saved.");
+      invalidateBids();
+    },
+    onError: (error: ApiError) => toast.error(error.message || "Failed to save financial bid data."),
   });
 
   const selectMutation = useMutation({
@@ -331,6 +354,54 @@ export function BidsPanel({ tenderId, currentStatus }: BidsPanelProps) {
               </Dialog>
             )}
           </div>
+
+          {isJe && currentStatus === "Financial Bid Opening Approved" && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <div>
+                <h5 className="text-sm font-semibold">Enter financial bid data</h5>
+                <p className="text-xs text-muted-foreground">
+                  Enter the bid amounts for qualified contractors. No winner is selected automatically.
+                </p>
+              </div>
+              {(technicalBids ?? []).filter((bid) => bid.status === "Qualified").length === 0 ? (
+                <p className="text-sm text-muted-foreground">No qualified contractors are available.</p>
+              ) : (
+                <div className="space-y-2">
+                  {(technicalBids ?? []).filter((bid) => bid.status === "Qualified").map((bid) => (
+                    <div key={bid.contractorId} className="grid gap-2 sm:grid-cols-[1fr_220px] sm:items-center">
+                      <span className="text-sm font-medium">{bid.contractorName}</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="Bid amount (₹)"
+                        value={jeFinancialAmounts[bid.contractorId] ?? ""}
+                        onChange={(event) =>
+                          setJeFinancialAmounts((current) => ({
+                            ...current,
+                            [bid.contractorId]: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    size="sm"
+                    disabled={
+                      saveJeFinancialMutation.isPending ||
+                      (technicalBids ?? []).filter((bid) => bid.status === "Qualified").some(
+                        (bid) => !Number(jeFinancialAmounts[bid.contractorId]) ||
+                          Number(jeFinancialAmounts[bid.contractorId]) <= 0
+                      )
+                    }
+                    onClick={() => saveJeFinancialMutation.mutate()}
+                  >
+                    {saveJeFinancialMutation.isPending ? "Saving..." : "Save financial bid data"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
           {isContractor && myTechnicalBid && myTechnicalBid.status !== "Qualified" && (
             <p className="text-xs text-muted-foreground">

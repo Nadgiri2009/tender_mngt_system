@@ -8,6 +8,7 @@ namespace TenderManagement.Domain.Entities
         public string TrackingId { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string? EligibilityCriteria { get; set; }
         public int DepartmentId { get; set; }
         public decimal EstimatedAmount { get; set; }
         public string TenderType { get; set; } = string.Empty;

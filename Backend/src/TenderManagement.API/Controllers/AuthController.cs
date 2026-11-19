@@ -22,6 +22,7 @@ namespace TenderManagement.API.Controllers
         [HttpPost("request-otp")]
         [ProducesResponseType(typeof(RequestLoginOtpResponseDto), StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> RequestOtp(
             [FromBody] RequestLoginOtpRequestDto request, CancellationToken cancellationToken)

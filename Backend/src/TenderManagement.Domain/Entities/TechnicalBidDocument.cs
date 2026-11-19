@@ -8,6 +8,7 @@ namespace TenderManagement.Domain.Entities
         public string FileName { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
         public DateTime UploadedDate { get; set; } = DateTime.UtcNow;
+        public int? UploadedBy { get; set; }
 
         public TechnicalBid TechnicalBid { get; set; } = null!;
     }

@@ -113,7 +113,8 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IFileStorageService>(sp =>
     new FileStorageService(
         sp.GetRequiredService<IWebHostEnvironment>().WebRootPath
-        ?? Directory.GetCurrentDirectory()
+        ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
+        sp.GetRequiredService<IWebHostEnvironment>().ContentRootPath
     ));
 
 
@@ -123,6 +124,7 @@ builder.Services.AddSingleton<IAuthOtpDeliveryService, DevelopmentOtpDeliverySer
 builder.Services.AddScoped<ITenderService, TenderService>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IBidService, BidService>();
+builder.Services.AddScoped<IContractorApplicationService, ContractorApplicationService>();
 builder.Services.AddScoped<IWorkService, WorkService>();
 builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 

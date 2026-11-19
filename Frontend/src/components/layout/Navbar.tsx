@@ -72,9 +72,14 @@ export function Navbar() {
                   </Link>
                 </Button>
               )}
+              {user?.role === ROLE_NAMES.TenderCell && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/applications">Contractor Reviews</Link>
+                </Button>
+              )}
               {user?.role !== ROLE_NAMES.JuniorEngineer && (
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/dashboard">
+                  <Link href={user?.role === ROLE_NAMES.ExternalBidder ? "/contractor/dashboard" : "/dashboard"}>
                     <LayoutDashboard className="mr-1 h-4 w-4" /> Dashboard
                   </Link>
                 </Button>
@@ -132,9 +137,14 @@ export function Navbar() {
                       </Link>
                     </Button>
                   )}
+                  {user?.role === ROLE_NAMES.TenderCell && (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/applications" onClick={() => setMobileOpen(false)}>Contractor Reviews</Link>
+                    </Button>
+                  )}
                   {user?.role !== ROLE_NAMES.JuniorEngineer && (
                     <Button asChild variant="outline" size="sm">
-                      <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <Link href={user?.role === ROLE_NAMES.ExternalBidder ? "/contractor/dashboard" : "/dashboard"} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                     </Button>
                   )}
                   {user?.role === ROLE_NAMES.JuniorEngineer && (

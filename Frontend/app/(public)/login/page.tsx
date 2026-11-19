@@ -72,7 +72,13 @@ export default function LoginPage() {
       }
       toast.success(`Welcome back, ${auth.fullName}.`);
       window.location.replace(
-        getAuthReturnUrl() ?? (auth.role === "Junior Engineer (JE)" ? "/admin" : "/dashboard")
+        getAuthReturnUrl() ?? (
+          auth.role === "ExternalBidder"
+            ? "/contractor/dashboard"
+            : auth.role === "Junior Engineer (JE)"
+              ? "/admin"
+              : "/dashboard"
+        )
       );
     },
     onError: (error: ApiError) => {

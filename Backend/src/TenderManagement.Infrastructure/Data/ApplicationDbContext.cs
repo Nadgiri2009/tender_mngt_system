@@ -25,6 +25,12 @@ namespace TenderManagement.Infrastructure.Data
         public DbSet<BOQItem> BOQItems => Set<BOQItem>();
         public DbSet<TechnicalBid> TechnicalBids => Set<TechnicalBid>();
         public DbSet<TechnicalBidDocument> TechnicalBidDocuments => Set<TechnicalBidDocument>();
+        public DbSet<TenderRequiredBidDocument> TenderRequiredBidDocuments => Set<TenderRequiredBidDocument>();
+        public DbSet<ContractorApplicationHistory> ContractorApplicationHistory => Set<ContractorApplicationHistory>();
+        public DbSet<ContractorApplicationRemark> ContractorApplicationRemarks => Set<ContractorApplicationRemark>();
+        public DbSet<TenderNotification> TenderNotifications => Set<TenderNotification>();
+        public DbSet<TenderDocumentVerificationHistory> TenderDocumentVerificationHistory => Set<TenderDocumentVerificationHistory>();
+        public DbSet<TenderVerificationReview> TenderVerificationReviews => Set<TenderVerificationReview>();
         public DbSet<FinancialBid> FinancialBids => Set<FinancialBid>();
         public DbSet<Agreement> Agreements => Set<Agreement>();
         public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
@@ -117,6 +123,7 @@ namespace TenderManagement.Infrastructure.Data
                 e.Property(x => x.TenderNumber).IsRequired().HasMaxLength(50);
                 e.HasIndex(x => x.TenderNumber).IsUnique();
                 e.Property(x => x.EstimatedAmount).HasColumnType("decimal(18,2)");
+                e.Property(x => x.EligibilityCriteria).HasMaxLength(4000);
                 e.Property(x => x.TenderCategoryName).HasColumnName("TenderCategory").HasMaxLength(50);
                 e.Property(x => x.BudgetInformation).HasMaxLength(4000);
                 e.Property(x => x.TechnicalSanctionNumber).HasMaxLength(200);
@@ -223,6 +230,85 @@ namespace TenderManagement.Infrastructure.Data
                 e.Property(x => x.FileName).IsRequired().HasMaxLength(260);
                 e.Property(x => x.FilePath).IsRequired().HasMaxLength(400);
                 e.HasOne(x => x.TechnicalBid).WithMany(x => x.Documents).HasForeignKey(x => x.TechnicalBidId);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<TenderRequiredBidDocument>(e =>
+            {
+                e.ToTable("TenderRequiredBidDocuments");
+                e.HasKey(x => new { x.TenderId, x.DocumentType });
+                e.Property(x => x.DocumentType).HasMaxLength(160).IsRequired();
+                e.Property(x => x.Description).HasMaxLength(1000);
+                e.Property(x => x.AllowedExtensions).HasMaxLength(500);
+                e.HasOne<Tender>().WithMany().HasForeignKey(x => x.TenderId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ContractorApplicationHistory>(e =>
+            {
+                e.ToTable("ContractorApplicationHistory");
+                e.HasKey(x => x.HistoryId);
+                e.Property(x => x.EventType).HasMaxLength(40).IsRequired();
+                e.Property(x => x.PreviousStatus).HasMaxLength(30);
+                e.Property(x => x.NewStatus).HasMaxLength(30);
+                e.Property(x => x.Remarks).HasMaxLength(2000);
+                e.HasIndex(x => new { x.TechnicalBidId, x.CreatedAtUtc });
+                e.HasOne(x => x.TechnicalBid).WithMany().HasForeignKey(x => x.TechnicalBidId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ContractorApplicationRemark>(e =>
+            {
+                e.ToTable("ContractorApplicationRemarks");
+                e.HasKey(x => x.RemarkId);
+                e.Property(x => x.RemarkType).HasMaxLength(30).IsRequired();
+                e.Property(x => x.Message).HasMaxLength(2000).IsRequired();
+                e.HasIndex(x => new { x.TechnicalBidId, x.CreatedAtUtc });
+                e.HasOne<TechnicalBid>().WithMany().HasForeignKey(x => x.TechnicalBidId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<TenderNotification>(e =>
+            {
+                e.ToTable("TenderNotifications");
+                e.HasKey(x => x.NotificationId);
+                e.Property(x => x.NotificationType).HasMaxLength(60).IsRequired();
+                e.Property(x => x.Message).HasMaxLength(1000).IsRequired();
+                e.HasIndex(x => new { x.UserId, x.ReadAtUtc, x.CreatedAtUtc });
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Tender>().WithMany().HasForeignKey(x => x.TenderId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<TenderDocumentVerificationHistory>(e =>
+            {
+                e.ToTable("TenderDocumentVerificationHistory");
+                e.HasKey(x => x.DocumentVerificationHistoryId);
+                e.Property(x => x.FileName).HasMaxLength(520).IsRequired();
+                e.Property(x => x.FilePath).HasMaxLength(800).IsRequired();
+                e.Property(x => x.DocumentType).HasMaxLength(160).IsRequired();
+                e.Property(x => x.ReviewStage).HasMaxLength(20).IsRequired();
+                e.Property(x => x.VerificationStatus).HasMaxLength(20).IsRequired();
+                e.Property(x => x.Remarks).HasMaxLength(2000);
+                e.HasOne<Tender>().WithMany().HasForeignKey(x => x.TenderId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Contractor>().WithMany().HasForeignKey(x => x.ContractorId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<TechnicalBidDocument>().WithMany().HasForeignKey(x => x.TechnicalBidDocumentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Role>().WithMany().HasForeignKey(x => x.ReviewerRoleId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<TenderVerificationReview>(e =>
+            {
+                e.ToTable("TenderVerificationReviews");
+                e.HasKey(x => x.VerificationReviewId);
+                e.Property(x => x.ReviewStage).HasMaxLength(20).IsRequired();
+                e.Property(x => x.Decision).HasMaxLength(30).IsRequired();
+                e.Property(x => x.Remarks).HasMaxLength(2000);
+                e.HasOne<Tender>().WithMany().HasForeignKey(x => x.TenderId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Contractor>().WithMany().HasForeignKey(x => x.ContractorId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<Role>().WithMany().HasForeignKey(x => x.ReviewerRoleId).OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<FinancialBid>(e =>

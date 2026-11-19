@@ -50,6 +50,7 @@ export function CreateTenderForm() {
     defaultValues: {
       title: "",
       description: "",
+      eligibilityCriteria: "",
       departmentId: user?.departmentId ?? undefined,
       tenderType: "",
       tenderCategory: "",
@@ -64,6 +65,7 @@ export function CreateTenderForm() {
         {
           title: values.title,
           description: values.description || undefined,
+          eligibilityCriteria: values.eligibilityCriteria || undefined,
           departmentId: values.departmentId,
           estimatedAmount: values.estimatedAmount,
           tenderType: values.tenderType,
@@ -132,6 +134,12 @@ export function CreateTenderForm() {
             <Label htmlFor="description">Description and Scope of Work</Label>
             <Textarea id="description" rows={4} placeholder="Scope of work..." {...register("description")} />
             {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
+          </div>
+
+          <div className="sm:col-span-2 space-y-2">
+            <Label htmlFor="eligibilityCriteria">Eligibility Criteria</Label>
+            <Textarea id="eligibilityCriteria" rows={3} maxLength={4000} {...register("eligibilityCriteria")} />
+            {errors.eligibilityCriteria && <p className="text-sm text-destructive">{errors.eligibilityCriteria.message}</p>}
           </div>
 
           <div className="space-y-2">

@@ -38,6 +38,7 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
     defaultValues: {
       title: tender.title,
       description: tender.description ?? "",
+      eligibilityCriteria: tender.eligibilityCriteria ?? "",
       tenderType: tender.tenderType,
       tenderCategory: tender.tenderCategory ?? "",
       estimatedAmount: tender.estimatedAmount,
@@ -50,6 +51,7 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
       updateTender(tender.tenderId, {
         title: values.title,
         description: values.description || undefined,
+        eligibilityCriteria: values.eligibilityCriteria || undefined,
         estimatedAmount: values.estimatedAmount,
         tenderType: values.tenderType,
         tenderCategory: values.tenderCategory,
@@ -116,6 +118,12 @@ export function EditTenderForm({ tender }: EditTenderFormProps) {
             <Label htmlFor="description">Description</Label>
             <Textarea id="description" rows={4} {...register("description")} />
             {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
+          </div>
+
+          <div className="sm:col-span-2 space-y-2">
+            <Label htmlFor="eligibilityCriteria">Eligibility Criteria</Label>
+            <Textarea id="eligibilityCriteria" rows={3} maxLength={4000} {...register("eligibilityCriteria")} />
+            {errors.eligibilityCriteria && <p className="text-sm text-destructive">{errors.eligibilityCriteria.message}</p>}
           </div>
 
           <div className="space-y-2">

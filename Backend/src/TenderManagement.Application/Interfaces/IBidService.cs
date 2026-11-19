@@ -11,9 +11,10 @@ namespace TenderManagement.Application.Interfaces
             string termsVersion,
             IReadOnlyList<(string FileName, Stream Content)> files);
         Task<TechnicalBidDto> EvaluateTechnicalBidAsync(EvaluateTechnicalBidDto dto, int currentUserId);
-        Task<List<TechnicalBidDto>> GetTechnicalBidsAsync(int tenderId);
+        Task<List<TechnicalBidDto>> GetTechnicalBidsAsync(int tenderId, int currentUserId, bool tenderCell);
 
-        Task<FinancialBidDto> SubmitFinancialBidAsync(SubmitFinancialBidDto dto);
+        Task<FinancialBidDto> SubmitFinancialBidAsync(SubmitFinancialBidDto dto, int currentUserId);
+        Task<List<FinancialBidDto>> SaveJeFinancialDataAsync(SaveJeFinancialDataDto dto, int currentUserId);
         Task<List<FinancialBidDto>> GetFinancialBidsRankedAsync(int tenderId);
         Task<FinancialBidDto> SelectContractorAsync(SelectContractorDto dto, int currentUserId);
     }

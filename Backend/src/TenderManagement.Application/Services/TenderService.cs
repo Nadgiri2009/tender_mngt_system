@@ -54,7 +54,9 @@ namespace TenderManagement.Application.Services
                 assignment.ShortfallId == null &&
                 assignment.AssignedRoleId == roleId &&
                 (!assignment.AssignedUserId.HasValue || assignment.AssignedUserId == userId) &&
-                (role.RoleCode == "Junior Engineer (JE)" || !user.DepartmentId.HasValue || assignment.DepartmentId == user.DepartmentId.Value));
+                (RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName) ||
+                 !user.DepartmentId.HasValue ||
+                 assignment.DepartmentId == user.DepartmentId.Value));
             return assignments.Select(assignment => assignment.TenderId).Distinct().ToList();
         }
 
@@ -116,13 +118,14 @@ namespace TenderManagement.Application.Services
 
             var user = await _unitOfWork.Users.GetByIdAsync(currentUserId)
                 ?? throw new NotFoundException(nameof(User), currentUserId);
-            if (user.AccountType != "Internal" || !user.RoleId.HasValue)
+            if (!user.IsActive || user.AccountType != "Internal" || !user.RoleId.HasValue)
             {
-                throw new ForbiddenActionException("Only an internal Junior Engineer can create a tender.");
+                throw new ForbiddenActionException("Only an active internal Junior Engineer can create a tender.");
             }
 
             var role = await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value);
-            if (role is null || role.RoleCode != "Junior Engineer (JE)" || !role.IsActive)
+            if (role is null || !role.IsActive ||
+                !RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
             {
                 throw new ForbiddenActionException("Only an active Junior Engineer can create a tender.");
             }
@@ -151,6 +154,7 @@ namespace TenderManagement.Application.Services
                 TrackingId = Guid.NewGuid().ToString(),
                 Title = dto.Title,
                 Description = dto.Description,
+                EligibilityCriteria = dto.EligibilityCriteria,
                 DepartmentId = dto.DepartmentId.Value,
                 EstimatedAmount = dto.EstimatedAmount,
                 TenderType = dto.TenderType,
@@ -205,6 +209,7 @@ namespace TenderManagement.Application.Services
 
             tender.Title = dto.Title;
             tender.Description = dto.Description;
+            tender.EligibilityCriteria = dto.EligibilityCriteria;
             tender.EstimatedAmount = dto.EstimatedAmount;
             tender.TenderType = dto.TenderType;
             tender.TenderCategoryName = dto.TenderCategory;
@@ -428,7 +433,7 @@ namespace TenderManagement.Application.Services
             var role = user.RoleId.HasValue
                 ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value)
                 : null;
-            if (!string.Equals(role?.RoleCode, "Junior Engineer (JE)", StringComparison.OrdinalIgnoreCase) &&
+            if (!RoleNames.IsJuniorEngineerRole(role?.RoleCode, role?.RoleName) &&
                 (!user.DepartmentId.HasValue || user.DepartmentId.Value != tender.DepartmentId))
             {
                 throw new BusinessRuleException("The user is not assigned to the tender's department.");
@@ -479,6 +484,11 @@ namespace TenderManagement.Application.Services
             TrackingId = t.TrackingId,
             Title = t.Title,
             Description = t.Description,
+            EligibilityCriteria = t.EligibilityCriteria,
+            PreBidMeetingUtc = t.PreBidMeetingUtc,
+            PreBidLocation = t.PreBidLocation,
+            PreBidDetails = t.PreBidDetails,
+            TechnicalBidOpeningScheduledUtc = t.TechnicalBidOpeningScheduledUtc,
             DepartmentName = t.Department?.DepartmentName ?? string.Empty,
             EstimatedAmount = t.EstimatedAmount,
             CurrentStatus = t.CurrentStatus,

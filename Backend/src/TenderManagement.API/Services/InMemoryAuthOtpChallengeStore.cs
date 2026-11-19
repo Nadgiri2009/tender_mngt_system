@@ -16,7 +16,12 @@ namespace TenderManagement.API.Services
             new(StringComparer.Ordinal);
 
         public bool TryIssue(
-            string mobile, int? userId, string code, DateTimeOffset now, DateTimeOffset expiresAt)
+            string mobile,
+            int? userId,
+            string code,
+            DateTimeOffset now,
+            DateTimeOffset expiresAt,
+            out int retryAfterSeconds)
         {
             var entry = _entries.GetOrAdd(mobile, static _ => new ChallengeEntry());
             lock (entry.SyncRoot)
@@ -26,9 +31,16 @@ namespace TenderManagement.API.Services
                     entry.Requests.Dequeue();
                 }
 
-                if (entry.Requests.Count >= MaxRequestsPerWindow ||
-                    (entry.LastRequestedAt is { } lastRequestedAt &&
-                     now - lastRequestedAt < RequestCooldown))
+                var cooldownRemaining = entry.LastRequestedAt is { } lastRequestedAt
+                    ? Math.Max(0, (int)Math.Ceiling(
+                        (lastRequestedAt + RequestCooldown - now).TotalSeconds))
+                    : 0;
+                var windowRemaining = entry.Requests.Count >= MaxRequestsPerWindow
+                    ? Math.Max(0, (int)Math.Ceiling(
+                        (entry.Requests.Peek() + RequestWindow - now).TotalSeconds))
+                    : 0;
+                retryAfterSeconds = Math.Max(cooldownRemaining, windowRemaining);
+                if (retryAfterSeconds > 0)
                 {
                     return false;
                 }

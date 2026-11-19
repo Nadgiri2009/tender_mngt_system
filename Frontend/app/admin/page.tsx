@@ -6,6 +6,7 @@ import { FileText, Building2, Users, BarChart3, Eye, CheckCircle2, Clock3, XCirc
 
 import { fetchAdminStats } from "@/lib/api/dashboard";
 import { fetchTenders } from "@/lib/api/tenders";
+import { getContractors, getInternalApplications } from "@/lib/api/applications";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,30 @@ export default function AdminDashboardPage() {
         sortDescending: true,
       }),
   });
+  const { data: applications, isLoading: loadingApplications, isError: applicationsError } = useQuery({
+    queryKey: ["internal-contractor-applications"],
+    queryFn: getInternalApplications,
+  });
+  const { data: contractors, isLoading: loadingContractors, isError: contractorsError } = useQuery({
+    queryKey: ["admin-contractors"],
+    queryFn: getContractors,
+  });
+  const applicationsByTender = (applications ?? []).reduce((counts, application) => {
+    counts.set(application.tenderId, {
+      tenderNumber: application.tenderNumber,
+      title: application.tenderTitle,
+      count: (counts.get(application.tenderId)?.count ?? 0) + 1,
+    });
+    return counts;
+  }, new Map<number, { tenderNumber: string; title: string; count: number }>());
+  const contractorApplicationCounts = [
+    ["Registered Contractors", contractors?.length],
+    ["Applications Received", applications?.length],
+    ["Pending", applications?.filter((item) => item.status === "Submitted").length],
+    ["Under Verification", applications?.filter((item) => item.status === "UnderVerification").length],
+    ["Shortfall", applications?.filter((item) => item.status === "Shortfall").length],
+    ["Approved / Rejected", applications?.filter((item) => item.status === "Qualified" || item.status === "Disqualified").length],
+  ] as const;
 
   return (
     <div>
@@ -82,6 +107,39 @@ export default function AdminDashboardPage() {
           </Link>
         ))}
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-3 text-base">
+            <span>Contractor Management</span>
+            <Button asChild size="sm" variant="outline"><Link href="/applications">View Applications</Link></Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(applicationsError || contractorsError) &&
+            <p role="alert" className="text-sm text-destructive">Could not load contractor or application records.</p>}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {contractorApplicationCounts.map(([label, count]) => (
+              <div key={label} className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">
+                  {loadingApplications || loadingContractors ? "…" : count ?? 0}
+                </p>
+              </div>
+            ))}
+          </div>
+          {applicationsByTender.size > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Tender-wise Applications</p>
+              {[...applicationsByTender.values()].map((item) => (
+                <div key={item.tenderNumber} className="flex justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                  <span>{item.tenderNumber} · {item.title}</span><strong>{item.count}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>

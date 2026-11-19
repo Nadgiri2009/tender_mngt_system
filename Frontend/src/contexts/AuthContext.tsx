@@ -93,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearAuthSession();
     queryClient.clear();
     setUser(null);
-    router.replace("/");
-  }, [queryClient, router]);
+    window.location.replace("/");
+  }, [queryClient]);
 
   useEffect(() => {
     const showPendingSessionError = () => {

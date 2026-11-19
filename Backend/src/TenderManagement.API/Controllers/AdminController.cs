@@ -259,7 +259,7 @@ namespace TenderManagement.API.Controllers
                 item => item.RoleId == id && item.IsActive,
                 cancellationToken);
             if (role is null) return NotFound();
-            if (role.RoleCode is not ("Junior Engineer (JE)" or "TENDER_CELL" or "CHAIRMAN" or "DIRECTOR_AUDITOR"))
+            if (!RoleNames.IsApprovedInternalRole(role.RoleCode, role.RoleName))
             {
                 return Conflict(new { message = "Only the four approved roles can be managed." });
             }
@@ -269,7 +269,7 @@ namespace TenderManagement.API.Controllers
                 .Select(key => key.Trim())
                 .Distinct(StringComparer.Ordinal)
                 .ToHashSet(StringComparer.Ordinal);
-            if (role.RoleCode == "Junior Engineer (JE)")
+            if (RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
             {
                 requestedKeys.UnionWith(new[] { "users.manage", "masterdata.manage", "roles.manage" });
             }
@@ -337,7 +337,7 @@ namespace TenderManagement.API.Controllers
 
         /// <summary>GET /api/contractors</summary>
         [HttpGet]
-        [Authorize(Roles = $"{RoleNames.JuniorEngineer},{RoleNames.TenderCell},{RoleNames.TenderCommitteeChairman},{RoleNames.DirectorAuditor}")]
+        [Authorize(Roles = RoleNames.JuniorEngineer)]
         public async Task<IActionResult> GetAll() => Ok(await _unitOfWork.Contractors.GetAllAsync());
 
         /// <summary>
@@ -479,7 +479,7 @@ namespace TenderManagement.API.Controllers
 
             var role = await _unitOfWork.Roles.GetByIdAsync(dto.RoleId)
                 ?? throw new NotFoundException(nameof(Role), dto.RoleId);
-            if (!role.IsActive || role.RoleCode is not ("Junior Engineer (JE)" or "TENDER_CELL" or "CHAIRMAN" or "DIRECTOR_AUDITOR"))
+            if (!role.IsActive || !RoleNames.IsApprovedInternalRole(role.RoleCode, role.RoleName))
             {
                 throw new BusinessRuleException("Staff accounts can only use one of the four approved internal roles.");
             }
@@ -540,7 +540,7 @@ namespace TenderManagement.API.Controllers
 
             var role = await _unitOfWork.Roles.GetByIdAsync(dto.RoleId)
                 ?? throw new NotFoundException(nameof(Role), dto.RoleId);
-            if (!role.IsActive || role.RoleCode is not ("Junior Engineer (JE)" or "TENDER_CELL" or "CHAIRMAN" or "DIRECTOR_AUDITOR"))
+            if (!role.IsActive || !RoleNames.IsApprovedInternalRole(role.RoleCode, role.RoleName))
             {
                 throw new BusinessRuleException("Staff accounts can only use one of the four approved internal roles.");
             }
@@ -555,11 +555,13 @@ namespace TenderManagement.API.Controllers
             var currentRole = user.RoleId.HasValue
                 ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value)
                 : null;
-            if (currentRole?.RoleCode == "Junior Engineer (JE)" && role.RoleCode != "Junior Engineer (JE)")
+            if (currentRole is not null &&
+                RoleNames.IsJuniorEngineerRole(currentRole.RoleCode, currentRole.RoleName) &&
+                !RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
             {
                 var activejeCount = await _context.Users.CountAsync(
                     existing => existing.IsActive && existing.AccountType == "Internal" &&
-                        existing.Role != null && existing.Role.RoleCode == "Junior Engineer (JE)");
+                        existing.Role != null && existing.Role.RoleName == RoleNames.JuniorEngineer);
                 if (activejeCount <= 1)
                 {
                     return Conflict(new { message = "The last active Junior Engineer (JE) Main Admin cannot be reassigned." });
@@ -594,11 +596,12 @@ namespace TenderManagement.API.Controllers
             }
 
             var role = user.RoleId.HasValue ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value) : null;
-            if (!activating && role?.RoleCode == "Junior Engineer (JE)")
+            if (!activating && role is not null &&
+                RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
             {
                 var activejeCount = await _context.Users.CountAsync(
                     existing => existing.IsActive && existing.AccountType == "Internal" &&
-                        existing.Role != null && existing.Role.RoleCode == "Junior Engineer (JE)");
+                        existing.Role != null && existing.Role.RoleName == RoleNames.JuniorEngineer);
                 if (activejeCount <= 1)
                 {
                     return Conflict(new { message = "The last active Junior Engineer (JE) Main Admin cannot be deactivated." });
@@ -641,11 +644,12 @@ namespace TenderManagement.API.Controllers
             }
 
             var role = user.RoleId.HasValue ? await _unitOfWork.Roles.GetByIdAsync(user.RoleId.Value) : null;
-            if (user.IsActive && role?.RoleCode == "Junior Engineer (JE)")
+            if (user.IsActive && role is not null &&
+                RoleNames.IsJuniorEngineerRole(role.RoleCode, role.RoleName))
             {
                 var activejeCount = await _context.Users.CountAsync(
                     existing => existing.IsActive && existing.AccountType == "Internal" &&
-                        existing.Role != null && existing.Role.RoleCode == "Junior Engineer (JE)");
+                        existing.Role != null && existing.Role.RoleName == RoleNames.JuniorEngineer);
                 if (activejeCount <= 1)
                 {
                     return Conflict(new { message = "The last active Junior Engineer (JE) Main Admin cannot be deleted." });

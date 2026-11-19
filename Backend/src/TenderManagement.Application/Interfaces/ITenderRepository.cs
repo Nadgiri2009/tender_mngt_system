@@ -16,7 +16,11 @@ namespace TenderManagement.Application.Interfaces
             int userId,
             int? departmentId,
             bool isJuniorEngineer);
-        Task<List<Tender>> GetDashboardTendersAsync(int? createdByUserId, int limit, bool upcomingOnly);
+        Task<List<Tender>> GetDashboardTendersAsync(
+            int? createdByUserId,
+            int limit,
+            bool upcomingOnly,
+            IReadOnlyCollection<int>? allowedTenderIds = null);
         Task<Tender?> GetWithDetailsAsync(int tenderId);
         Task<string> GenerateNextTenderNumberAsync();
     }

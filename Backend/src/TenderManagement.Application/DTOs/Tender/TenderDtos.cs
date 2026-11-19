@@ -10,6 +10,9 @@ namespace TenderManagement.Application.DTOs.Tender
         [StringLength(4000)]
         public string? Description { get; set; }
 
+        [StringLength(4000)]
+        public string? EligibilityCriteria { get; set; }
+
         [Required, Range(1, int.MaxValue, ErrorMessage = "A valid Department must be selected.")]
         public int? DepartmentId { get; set; }
 
@@ -55,6 +58,9 @@ namespace TenderManagement.Application.DTOs.Tender
 
         [StringLength(4000)]
         public string? Description { get; set; }
+
+        [StringLength(4000)]
+        public string? EligibilityCriteria { get; set; }
 
         [Required, Range(0.01, double.MaxValue, ErrorMessage = "Estimated amount must be greater than zero.")]
         public decimal EstimatedAmount { get; set; }
@@ -113,6 +119,11 @@ namespace TenderManagement.Application.DTOs.Tender
     public class TenderDetailDto : TenderListItemDto
     {
         public string? Description { get; set; }
+        public string? EligibilityCriteria { get; set; }
+        public DateTime? PreBidMeetingUtc { get; set; }
+        public string? PreBidLocation { get; set; }
+        public string? PreBidDetails { get; set; }
+        public DateTime? TechnicalBidOpeningScheduledUtc { get; set; }
         public string CreatedByName { get; set; } = string.Empty;
         public List<BOQItemDto> BOQItems { get; set; } = new();
         public List<TenderDocumentDto> Documents { get; set; } = new();

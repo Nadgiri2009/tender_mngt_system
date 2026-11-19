@@ -17,4 +17,16 @@ namespace TenderManagement.Application.Common
     {
         public ForbiddenActionException(string message) : base(message) { }
     }
+
+    /// <summary>Thrown when another sign-in code cannot be issued yet.</summary>
+    public sealed class OtpRequestRateLimitException : Exception
+    {
+        public OtpRequestRateLimitException(int retryAfterSeconds)
+            : base($"A sign-in code was requested recently. Please wait {retryAfterSeconds} seconds before trying again.")
+        {
+            RetryAfterSeconds = retryAfterSeconds;
+        }
+
+        public int RetryAfterSeconds { get; }
+    }
 }

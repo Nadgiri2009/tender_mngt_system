@@ -20,6 +20,9 @@ import { WorkflowPanel } from "@/components/tenders/WorkflowPanel";
 import { BidsPanel } from "@/components/tenders/BidsPanel";
 import { DeleteTenderDialog } from "@/components/tenders/DeleteTenderDialog";
 import { ROLE_NAMES } from "@/types/auth";
+import { ApplicationRequirementsEditor } from "@/components/tenders/ApplicationRequirementsEditor";
+
+const apiOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5050/api").replace(/\/api\/?$/, "");
 
 interface TenderDetailViewProps {
   tenderId: number;
@@ -108,9 +111,19 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
                 <p className="text-sm font-medium text-muted-foreground">Description</p>
                 <p className="mt-1 text-sm text-foreground break-words">{tender.description || "No description provided."}</p>
               </div>
+              {tender.eligibilityCriteria && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Eligibility Criteria</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-foreground break-words">{tender.eligibilityCriteria}</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div>
-                  <p className="text-xs text-muted-foreground">Tender Type</p>
+                  <p className="text-xs text-muted-foreground">Tender Method</p>
+                  <p className="text-sm font-medium break-words">{tender.tenderType || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Tender Category</p>
                   <p className="text-sm font-medium break-words">{tender.tenderCategory ?? "—"}</p>
                 </div>
                 <div>
@@ -129,6 +142,18 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
                   <p className="text-xs text-muted-foreground">Publication Date</p>
                   <p className="text-sm font-medium break-words">{formatDate(tender.publicationDate)}</p>
                 </div>
+                {tender.preBidMeetingUtc && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Pre-bid Meeting</p>
+                    <p className="text-sm font-medium break-words">{formatDate(tender.preBidMeetingUtc)}</p>
+                  </div>
+                )}
+                {tender.technicalBidOpeningScheduledUtc && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Technical Bid Opening</p>
+                    <p className="text-sm font-medium break-words">{formatDate(tender.technicalBidOpeningScheduledUtc)}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground">Application Status</p>
                   <p className="text-sm font-medium break-words">{tender.applicationStatus}</p>
@@ -137,6 +162,13 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
                   <p className="text-xs text-muted-foreground">Created By</p>
                   <p className="text-sm font-medium break-words">{tender.createdByName || "—"}</p>
                 </div>
+                {tender.preBidDetails && (
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium text-muted-foreground">Pre-bid Details</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-foreground break-words">{tender.preBidDetails}</p>
+                    {tender.preBidLocation && <p className="mt-1 text-sm text-muted-foreground">Location: {tender.preBidLocation}</p>}
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground">Created Date</p>
                   <p className="text-sm font-medium break-words">{formatDate(tender.createdDate)}</p>
@@ -144,6 +176,8 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
               </div>
             </CardContent>
           </Card>
+
+          {canEditDelete && <ApplicationRequirementsEditor tenderId={tender.tenderId} />}
 
           <Card>
             <CardContent className="pt-6">
@@ -193,7 +227,9 @@ export function TenderDetailView({ tenderId }: TenderDetailViewProps) {
                 <ul className="space-y-2">
                   {tender.documents.map((doc) => (
                     <li key={doc.documentId} className="text-sm">
-                      <span className="font-medium">{doc.fileName}</span>{" "}
+                      <a className="font-medium text-primary underline" href={`${apiOrigin}/${doc.filePath.replace(/^[\\/]+/, "")}`} target="_blank" rel="noreferrer">
+                        {doc.fileName}
+                      </a>{" "}
                       <span className="text-muted-foreground">({doc.documentType})</span>
                     </li>
                   ))}

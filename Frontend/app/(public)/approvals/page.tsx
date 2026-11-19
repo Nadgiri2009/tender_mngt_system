@@ -123,6 +123,9 @@ export default function ApprovalsPage() {
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <ClipboardCheck className="h-8 w-8" />
                       <p className="text-sm">Nothing waiting on your approval right now.</p>
+                      <p className="max-w-md text-xs">
+                        This queue shows only tenders currently assigned to your workflow role and ready for action.
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>

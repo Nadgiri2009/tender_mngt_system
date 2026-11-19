@@ -59,6 +59,14 @@ const ADMIN_GROUPS = [
       { href: "/admin/announcements", label: "Announcements", icon: ClipboardList },
     ],
   },
+  {
+    label: "Contractor Management",
+    icon: Users,
+    items: [
+      { href: "/admin/contractors", label: "Contractor List", icon: Users },
+      { href: "/applications", label: "Tender Applications", icon: ClipboardList },
+    ],
+  },
 ];
 
 function NavigationGroups({
