@@ -23,6 +23,10 @@
 **/appsettings.Local.json
 **/appsettings.*.Local.json
 **/appsettings.*.Staging.json
+**/appsettings.*.Secrets.json
+**/appsettings.Secrets.json
+**/appsettings.*.local.json
+**/appsettings.local.json
 **/secrets.json
 **/secrets.*.json
 **/credentials.json

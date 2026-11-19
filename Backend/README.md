@@ -117,6 +117,22 @@ variable in deployed environments. The structural example configuration is in
 `src/TenderManagement.API/appsettings.Example.json`; keep real keys and passwords out of that file.
 `Cors:AllowedOrigins` should include the deployed frontend's origin.
 
+### IIS production configuration
+
+`WebApplication.CreateBuilder` loads environment variables through the standard ASP.NET Core
+configuration providers. For production, set `ASPNETCORE_ENVIRONMENT=Production` and provide
+`ConnectionStrings__DefaultConnection`, `Jwt__Key`, and `Cors__AllowedOrigins` to the IIS
+application pool through the server's protected deployment or secret-management process. Do not
+put these values in source-controlled `web.config`, `appsettings*.json`, launch profiles, or
+deployment scripts.
+
+Keep server configuration files readable only by administrators and the deployment identity;
+grant the application-pool identity only the access it needs. Prefer Windows Authentication to SQL
+Server with a least-privilege application-pool identity. Use encrypted SQL connections with a
+valid server certificate in production; do not carry the local example's trust/unencrypted options
+into production. User Secrets are for local Development only and are not an IIS secret store.
+Recycle the application pool after changing server-side environment configuration.
+
 ## Running tests / sanity-checking
 
 From the repository root, build the API with
