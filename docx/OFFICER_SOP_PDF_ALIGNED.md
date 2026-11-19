@@ -42,14 +42,6 @@ Use this single page as the operational checklist for all officer logins from te
 - For existing databases, rehearse `SMC_TENDER_DATABASE.sql` in `Upgrade` mode on a verified
   restored copy; do not apply individual historical migration scripts.
 
-## Quick Test Accounts (from DatabaseSetup)
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
+## Test Accounts
+
+Reusable test credentials are intentionally excluded from this document. Provision authorized local test accounts through a controlled process and store credentials outside version control.

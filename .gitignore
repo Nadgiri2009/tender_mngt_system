@@ -19,6 +19,35 @@
 !**/.env.*.example
 **/appsettings.Development.json
 **/appsettings.Production.json
+**/appsettings.Staging.json
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/appsettings.*.Staging.json
+**/secrets.json
+**/secrets.*.json
+**/credentials.json
+**/credentials.*.json
+**/.secrets/
+**/secrets/
+**/credentials/
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/id_rsa
+**/id_rsa.*
+**/id_ed25519
+**/id_ed25519.*
+**/.git-credentials
+**/.netrc
+**/.pgpass
+**/*.publishsettings
+**/PublishProfiles/*.pubxml
+**/PublishProfiles/*.publishsettings
+**/.aws/credentials
+**/.azure/
+**/.npmrc
+!**/.npmrc.example
 
 # Uploaded/runtime files
 /Backend/src/TenderManagement.API/wwwroot/uploads/*
